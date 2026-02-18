@@ -13,6 +13,9 @@
 ## Key Changes Since Last Checkpoint
 - Added operational runbooks for GitHub access, n8n restore, Supabase migrations, and webhook incidents
 - Added `ADR-0001` for hybrid docs model
+- Added `mvp-scope-and-acceptance.md` with 10 Given/When/Then criteria and out-of-scope fallback examples
+- Added `api-contract-rag-query.md` and fallback decision matrix for predictable low-confidence behavior
+- Added `rag-smoke-test.md` runbook for minimum vertical-slice validation
 
 ## Risks
 - Docs drift between Notion and repo if end-of-session updates are skipped

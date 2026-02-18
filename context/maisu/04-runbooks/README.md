@@ -7,6 +7,8 @@ Operational procedures for recurring tasks.
 - `n8n-workflow-restore.md`
 - `supabase-schema-migration.md`
 - `incident-webhook-failures.md`
+- `fallback-decision-matrix.md`
+- `rag-smoke-test.md`
 
 ## Coverage status
 - Credential rotation runbook: pending
