@@ -14,3 +14,10 @@ Thumbs.db
 
 # Node (if added later)
 node_modules/
+
+# Python
+.venv/
+**/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
