@@ -22,6 +22,24 @@ Chatbot turístico con personalidad local vasca usando **n8n + Supabase + Claude
    ```bash
    ./scripts/rag-smoke-test.sh https://[tu-endpoint]/rag/query "Mejor bar de pintxos en Bilbao"
    ```
+8. Levanta el backend FastAPI local (opcional, paralelo a n8n):
+   ```bash
+   cd backend
+   python -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   export SUPABASE_URL="https://[tu-proyecto].supabase.co"
+   export SUPABASE_SERVICE_ROLE_KEY="[tu-service-role-key]"
+   uvicorn app.main:app --reload --port 8000
+   ```
+   > Si no defines `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, el retrieval usa documentos mock de fallback.
+9. Smoke test del backend API local:
+   ```bash
+   ./scripts/rag-smoke-test-api.sh http://127.0.0.1:8000 "Mejor bar de pintxos en Bilbao"
+   ```
+10. Test rápido de backend:
+   ```bash
+   cd backend && pytest -q
+   ```
 
 Guía detallada: **`SETUP.md`**
 
@@ -38,6 +56,11 @@ Guía detallada: **`SETUP.md`**
 │   ├── system-prompt-aitor.md
 │   ├── n8n-workflows-guide.md
 │   └── ...
+├── backend/
+│   ├── app/
+│   │   └── main.py
+│   ├── tests/
+│   └── requirements.txt
 ├── n8n/
 │   └── bilbot-main-conversation.json
 │   └── data-ingestion-workflow.json
@@ -48,6 +71,7 @@ Guía detallada: **`SETUP.md`**
 └── scripts/
     └── test-webhook.sh
     └── rag-smoke-test.sh
+    └── rag-smoke-test-api.sh
 ```
 
 ---
@@ -69,9 +93,7 @@ Incluye:
 - Prompt y documentación de producto
 - Script de test para webhook
 - Workflow de data ingestion (places + embeddings)
-
-No incluye (todavía):
-- Endpoints externos de RAG listos para producción (solo workflows n8n)
+- Backend FastAPI mínimo para endpoint `/rag/query` con fallback
 
 ---
 

@@ -15,3 +15,7 @@ Segmented technical context for the Maisu project.
 - Stable docs: update only when fundamentals change.
 - Decisions: always record as ADR in `05-decisions/`.
 - Checkpoints: add a new file per milestone/week.
+
+## Quick entrypoints
+- API contract (`POST /rag/query`): `01-architecture/api-contract-rag-query.md`
+- RAG smoke test runbook: `04-runbooks/rag-smoke-test.md`

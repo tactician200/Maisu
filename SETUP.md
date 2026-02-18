@@ -337,6 +337,47 @@ OPENAI_API_KEY=[tu-api-key]
 
 ---
 
+## 🧩 Backend FastAPI RAG (opcional, paralelo a n8n)
+
+Este repo incluye un backend mínimo en `backend/` con:
+- `GET /health` → `{ "status": "ok" }`
+- `POST /rag/query` → contrato estable `{ answer, citations, latency_ms, fallback_used, provider }`
+
+### Levantar en local
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+### Variables de entorno backend
+
+```env
+OPENAI_API_KEY=[tu-api-key]            # opcional para provider OpenAI
+OPENAI_MODEL=gpt-4o-mini               # opcional
+OPENAI_TIMEOUT_SECONDS=8               # opcional
+SUPABASE_URL=https://[tu-proyecto].supabase.co          # requerido para retrieval real
+SUPABASE_SERVICE_ROLE_KEY=[tu-service-role-key]         # requerido para retrieval real
+```
+
+Notas:
+- Para retrieval real desde Supabase REST debes definir **ambas**: `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`.
+- Si faltan esas variables o falla la consulta (timeout/error/0 resultados), el backend usa documentos mock de fallback.
+- Si OpenAI no está disponible (timeout/rate-limit/credenciales), responde con fallback sin romper el endpoint.
+
+### Test rápido backend
+
+```bash
+# tests unitarios
+cd backend && pytest -q
+
+# smoke del endpoint
+cd .. && ./scripts/rag-smoke-test-api.sh http://127.0.0.1:8000 "Mejor bar de pintxos en Bilbao"
+```
+
 ## ✅ Verificación Final
 
 ### Checklist de Completitud

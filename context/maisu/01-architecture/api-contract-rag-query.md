@@ -1,75 +1,108 @@
-# API Contract — `POST /rag/query`
+# API Contract — `POST /rag/query` (FastAPI parallel path)
 
 ## Purpose
-Return a grounded tourism answer for Bilbao using retrieval context and explicit citation/fallback behavior.
+Return a grounded Bilbao-focused answer using retrieval + LLM, with explicit fallback when evidence is weak.
 
-## Request
+## Request schema
+`Content-Type: application/json`
+
 ```json
 {
-  "query": "What are the best family activities in Bilbao?",
-  "locale": "en",
-  "max_citations": 3,
-  "session_id": "optional-session-id"
+  "query": "Mejor bar de pintxos en Bilbao",
+  "top_k": 3,
+  "session_id": "smoke-local-001"
 }
 ```
 
-### Validation Rules
-- `query` required, non-empty string (3..1000 chars)
-- `locale` optional (default: auto-detect)
-- `max_citations` optional, integer (1..5), default `3`
-- unknown fields ignored (MVP) or rejected by strict mode
+### Fields
+- `query` **required**: string, non-empty
+- `top_k` optional: integer `1..10` (default: `3`)
+- `session_id` optional: string for tracing
 
-## Success Response (grounded answer)
+### Validation / 4xx
+- Empty or missing `query` → `400 invalid_input`
+- Malformed JSON body → `400 invalid_json`
+- Missing/invalid auth (if enabled) → `401 unauthorized` / `403 forbidden`
+- Rate limit exceeded → `429 rate_limited`
+
+## Success response (`200`)
 ```json
 {
   "ok": true,
-  "answer": "You can start with the Guggenheim area...",
+  "answer": "Empieza por Plaza Nueva y luego prueba...",
   "citations": [
     {
       "id": "src_012#chunk_03",
       "title": "Bilbao Family Guide",
-      "url": "https://example.org/bilbao-family-guide",
-      "snippet": "Family-friendly activities include..."
+      "url": "https://example.org/bilbao",
+      "snippet": "..."
     }
   ],
-  "confidence": 0.82,
+  "confidence": 0.81,
   "fallback": false,
+  "fallback_reason": null,
   "meta": {
-    "retrieval_k": 6,
-    "latency_ms": 1840
+    "retrieval_k": 3,
+    "latency_ms": 840,
+    "path": "parallel",
+    "request_id": "req_abc123",
+    "trace_id": "trc_abc123"
   }
 }
 ```
 
-## Fallback Response (low confidence / missing evidence)
+## Fallback behavior (`200` with `fallback=true`)
+Trigger fallback when retrieval is empty, confidence is below threshold, scope is out of Bilbao MVP, or retrieval/LLM quality is insufficient.
+
 ```json
 {
   "ok": true,
-  "answer": "I don’t have enough reliable context yet. Do you want indoor or outdoor options in Bilbao?",
+  "answer": "No tengo suficiente evidencia fiable todavía. ¿Prefieres Casco Viejo o Abando?",
   "citations": [],
   "confidence": 0.24,
   "fallback": true,
   "fallback_reason": "low_retrieval_confidence",
   "meta": {
     "retrieval_k": 0,
-    "latency_ms": 920
+    "latency_ms": 410,
+    "path": "parallel",
+    "request_id": "req_def456"
   }
 }
 ```
 
-## Error Response (standard)
+## Error model (non-2xx)
 ```json
 {
   "ok": false,
   "error": {
-    "code": "invalid_input",
-    "message": "query is required"
+    "code": "rate_limited",
+    "message": "Too many requests",
+    "retry_after_ms": 1000
+  },
+  "meta": {
+    "request_id": "req_xyz789",
+    "path": "parallel"
   }
 }
 ```
 
-## Error Codes (MVP)
-- `invalid_input` — malformed request
-- `upstream_error` — embedding/LLM/retrieval provider failure
-- `timeout` — pipeline exceeded timeout budget
-- `internal_error` — unclassified backend error
+### Error codes
+- `invalid_input` (`400`)
+- `invalid_json` (`400`)
+- `unauthorized` (`401`)
+- `forbidden` (`403`)
+- `rate_limited` (`429`)
+- `timeout` (`504`)
+- `upstream_error` (`502`)
+- `internal_error` (`500`)
+
+## Latency objective + observability
+- **SLO target (p95):** `<= 2.5s`
+- **Hard timeout:** `<= 8s` end-to-end
+- Emit/track per request (logs + metrics):
+  - `request_id`, `trace_id`, `session_id`
+  - `path` (`parallel`)
+  - `latency_ms`
+  - `retrieval_k`, `confidence`, `fallback`, `fallback_reason`
+  - HTTP `status_code`, `error.code` (if any)
