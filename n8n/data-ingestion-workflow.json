@@ -1,0 +1,450 @@
+{
+  "name": "MAISU - Data Ingestion (Places + Embeddings)",
+  "meta": {
+    "instanceUrl": "https://[your-n8n].app.n8n.cloud/",
+    "description": "Manual ingestion of place rows with OpenAI embeddings into Supabase."
+  },
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        280
+      ]
+    },
+    {
+      "id": "if-sheets",
+      "name": "Sheets ID Present?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        360,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !!$env.MAISU_SHEETS_ID && $env.MAISU_SHEETS_ID.trim().length > 0 }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "google-sheets",
+      "name": "Read Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        600,
+        160
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": "={{ $env.MAISU_SHEETS_ID }}",
+        "sheetName": "={{ $env.MAISU_SHEETS_TAB || 'places' }}",
+        "range": "",
+        "options": {
+          "dataLocationOnSheet": "header",
+          "valueRenderMode": "UNFORMATTED_VALUE"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Requires Google Sheets credentials. Set MAISU_SHEETS_ID (+ optional MAISU_SHEETS_TAB)."
+    },
+    {
+      "id": "mock-row",
+      "name": "Mock Row (Set)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        600,
+        400
+      ],
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "nombre",
+              "value": "Gure Toki"
+            },
+            {
+              "name": "tipo",
+              "value": "bar"
+            },
+            {
+              "name": "descripcion",
+              "value": "Bar de pintxos con barra creativa y ambiente local."
+            },
+            {
+              "name": "direccion",
+              "value": "Plaza Nueva 12, Bilbao"
+            },
+            {
+              "name": "barrio",
+              "value": "Casco Viejo"
+            },
+            {
+              "name": "tags",
+              "value": "pintxos,bar,casco viejo"
+            },
+            {
+              "name": "rango_precio",
+              "value": "EUR"
+            },
+            {
+              "name": "especialidad",
+              "value": "pintxos"
+            },
+            {
+              "name": "tipo_cocina",
+              "value": "vasca"
+            },
+            {
+              "name": "por_que_es_especial",
+              "value": "Producto fresco y trato cercano."
+            },
+            {
+              "name": "historia_breve",
+              "value": "Clasico del Casco Viejo desde los 90."
+            },
+            {
+              "name": "website",
+              "value": "https://[example.com]"
+            },
+            {
+              "name": "instagram",
+              "value": "https://[instagram.com/guretoki]"
+            },
+            {
+              "name": "created_by",
+              "value": "n8n-mock"
+            }
+          ],
+          "number": [
+            {
+              "name": "precio_medio",
+              "value": 18
+            },
+            {
+              "name": "valoracion_local",
+              "value": 4.7
+            }
+          ],
+          "boolean": [
+            {
+              "name": "es_trampa_turistica",
+              "value": false
+            },
+            {
+              "name": "recomendado_por_locales",
+              "value": true
+            },
+            {
+              "name": "acepta_reservas",
+              "value": false
+            },
+            {
+              "name": "verified",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notesInFlow": true,
+      "notes": "Mock-friendly input. Duplicate node for more rows or switch to Google Sheets."
+    },
+    {
+      "id": "merge-sources",
+      "name": "Merge Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        840,
+        280
+      ],
+      "parameters": {
+        "mode": "append"
+      }
+    },
+    {
+      "id": "normalize-place",
+      "name": "Normalize Place",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        280
+      ],
+      "parameters": {
+        "language": "javascript",
+        "code": "const safeString = (v) => (v === null || v === undefined ? '' : String(v).trim());\nconst toNumber = (v) => {\n  if (v === null || v === undefined || v === '') return null;\n  const n = Number(v);\n  return Number.isNaN(n) ? null : n;\n};\nconst toBool = (v) => {\n  if (v === null || v === undefined || v === '') return null;\n  if (typeof v === 'boolean') return v;\n  const s = String(v).toLowerCase();\n  if (['true', '1', 'yes', 'y', 'si'].includes(s)) return true;\n  if (['false', '0', 'no', 'n'].includes(s)) return false;\n  return null;\n};\nconst parseList = (v) => {\n  if (v === null || v === undefined || v === '') return [];\n  if (Array.isArray(v)) return v.map((i) => safeString(i)).filter(Boolean);\n  return String(v)\n    .split(',')\n    .map((i) => safeString(i))\n    .filter(Boolean);\n};\nconst parseJson = (v) => {\n  if (v === null || v === undefined || v === '') return null;\n  if (typeof v === 'object') return v;\n  try {\n    return JSON.parse(v);\n  } catch (e) {\n    return null;\n  }\n};\nconst sqlString = (v) => {\n  const s = safeString(v);\n  return s ? `'${s.replace(/'/g, \"''\")}'` : 'NULL';\n};\nconst sqlNumber = (v) => (v === null || v === undefined ? 'NULL' : Number(v).toString());\nconst sqlBool = (v) => (v === null || v === undefined ? 'NULL' : v ? 'true' : 'false');\nconst sqlJson = (v) => {\n  if (!v) return 'NULL';\n  const s = JSON.stringify(v).replace(/'/g, \"''\");\n  return `'${s}'::jsonb`;\n};\nconst sqlArray = (arr) => {\n  if (!arr || arr.length === 0) return 'NULL';\n  return `ARRAY[${arr.map((v) => sqlString(v)).join(',')}]`;\n};\n\nreturn items.map((item) => {\n  const src = item.json;\n  const tags = parseList(src.tags);\n  const idiomas = parseList(src.idiomas_atencion || src.idiomas);\n  const place = {\n    id: safeString(src.id) || null,\n    nombre: safeString(src.nombre || src.name) || 'Nombre pendiente',\n    tipo: safeString(src.tipo || src.type) || 'otro',\n    descripcion: safeString(src.descripcion) || null,\n    descripcion_corta: safeString(src.descripcion_corta) || null,\n    direccion: safeString(src.direccion) || null,\n    barrio: safeString(src.barrio) || null,\n    telefono: safeString(src.telefono) || null,\n    horario: parseJson(src.horario),\n    precio_medio: toNumber(src.precio_medio),\n    rango_precio: safeString(src.rango_precio) || null,\n    valoracion_local: toNumber(src.valoracion_local),\n    tags,\n    especialidad: safeString(src.especialidad) || null,\n    tipo_cocina: safeString(src.tipo_cocina) || null,\n    por_que_es_especial: safeString(src.por_que_es_especial) || null,\n    historia_breve: safeString(src.historia_breve) || null,\n    es_trampa_turistica: toBool(src.es_trampa_turistica),\n    recomendado_por_locales: toBool(src.recomendado_por_locales),\n    website: safeString(src.website) || null,\n    instagram: safeString(src.instagram) || null,\n    imagenes: parseJson(src.imagenes),\n    horario_especial: parseJson(src.horario_especial),\n    accesibilidad: parseJson(src.accesibilidad),\n    idiomas_atencion: idiomas,\n    acepta_reservas: toBool(src.acepta_reservas),\n    created_by: safeString(src.created_by) || 'n8n-ingestion',\n    verified: toBool(src.verified)\n  };\n\n  const embeddingText = [\n    place.nombre,\n    place.tipo,\n    place.descripcion,\n    place.barrio,\n    place.tags.join(', '),\n    place.especialidad,\n    place.tipo_cocina,\n    place.por_que_es_especial,\n    place.historia_breve\n  ].filter(Boolean).join(' | ');\n\n  const sql = {\n    id: place.id ? `'${place.id.replace(/'/g, \"''\")}'::uuid` : 'gen_random_uuid()',\n    nombre: sqlString(place.nombre),\n    tipo: sqlString(place.tipo),\n    descripcion: sqlString(place.descripcion),\n    descripcion_corta: sqlString(place.descripcion_corta),\n    direccion: sqlString(place.direccion),\n    barrio: sqlString(place.barrio),\n    telefono: sqlString(place.telefono),\n    horario: sqlJson(place.horario),\n    precio_medio: sqlNumber(place.precio_medio),\n    rango_precio: sqlString(place.rango_precio),\n    valoracion_local: sqlNumber(place.valoracion_local),\n    tags: sqlArray(place.tags),\n    especialidad: sqlString(place.especialidad),\n    tipo_cocina: sqlString(place.tipo_cocina),\n    por_que_es_especial: sqlString(place.por_que_es_especial),\n    historia_breve: sqlString(place.historia_breve),\n    es_trampa_turistica: sqlBool(place.es_trampa_turistica),\n    recomendado_por_locales: sqlBool(place.recomendado_por_locales),\n    website: sqlString(place.website),\n    instagram: sqlString(place.instagram),\n    imagenes: sqlJson(place.imagenes),\n    horario_especial: sqlJson(place.horario_especial),\n    accesibilidad: sqlJson(place.accesibilidad),\n    idiomas_atencion: sqlArray(place.idiomas_atencion),\n    acepta_reservas: sqlBool(place.acepta_reservas),\n    created_by: sqlString(place.created_by),\n    verified: sqlBool(place.verified)\n  };\n\n  return {\n    json: {\n      place,\n      embedding_text: embeddingText,\n      sql,\n      metadata: {\n        source: safeString(src.source) || 'ingestion',\n        source_row_id: safeString(src.row_id || src.id) || null,\n        barrio: place.barrio,\n        tipo: place.tipo,\n        tags: place.tags\n      }\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "upsert-place",
+      "name": "Upsert Place",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        160
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO places (\n  id, nombre, tipo, descripcion, descripcion_corta, direccion, barrio, telefono,\n  horario, precio_medio, rango_precio, valoracion_local, tags, especialidad, tipo_cocina,\n  por_que_es_especial, historia_breve, es_trampa_turistica, recomendado_por_locales,\n  website, instagram, imagenes, horario_especial, accesibilidad, idiomas_atencion,\n  acepta_reservas, created_by, verified, updated_at\n) VALUES (\n  {{$json.sql.id}},\n  {{$json.sql.nombre}},\n  {{$json.sql.tipo}},\n  {{$json.sql.descripcion}},\n  {{$json.sql.descripcion_corta}},\n  {{$json.sql.direccion}},\n  {{$json.sql.barrio}},\n  {{$json.sql.telefono}},\n  {{$json.sql.horario}},\n  {{$json.sql.precio_medio}},\n  {{$json.sql.rango_precio}},\n  {{$json.sql.valoracion_local}},\n  {{$json.sql.tags}},\n  {{$json.sql.especialidad}},\n  {{$json.sql.tipo_cocina}},\n  {{$json.sql.por_que_es_especial}},\n  {{$json.sql.historia_breve}},\n  {{$json.sql.es_trampa_turistica}},\n  {{$json.sql.recomendado_por_locales}},\n  {{$json.sql.website}},\n  {{$json.sql.instagram}},\n  {{$json.sql.imagenes}},\n  {{$json.sql.horario_especial}},\n  {{$json.sql.accesibilidad}},\n  {{$json.sql.idiomas_atencion}},\n  {{$json.sql.acepta_reservas}},\n  {{$json.sql.created_by}},\n  {{$json.sql.verified}},\n  NOW()\n)\nON CONFLICT (id) DO UPDATE SET\n  nombre = EXCLUDED.nombre,\n  tipo = EXCLUDED.tipo,\n  descripcion = EXCLUDED.descripcion,\n  descripcion_corta = EXCLUDED.descripcion_corta,\n  direccion = EXCLUDED.direccion,\n  barrio = EXCLUDED.barrio,\n  telefono = EXCLUDED.telefono,\n  horario = EXCLUDED.horario,\n  precio_medio = EXCLUDED.precio_medio,\n  rango_precio = EXCLUDED.rango_precio,\n  valoracion_local = EXCLUDED.valoracion_local,\n  tags = EXCLUDED.tags,\n  especialidad = EXCLUDED.especialidad,\n  tipo_cocina = EXCLUDED.tipo_cocina,\n  por_que_es_especial = EXCLUDED.por_que_es_especial,\n  historia_breve = EXCLUDED.historia_breve,\n  es_trampa_turistica = EXCLUDED.es_trampa_turistica,\n  recomendado_por_locales = EXCLUDED.recomendado_por_locales,\n  website = EXCLUDED.website,\n  instagram = EXCLUDED.instagram,\n  imagenes = EXCLUDED.imagenes,\n  horario_especial = EXCLUDED.horario_especial,\n  accesibilidad = EXCLUDED.accesibilidad,\n  idiomas_atencion = EXCLUDED.idiomas_atencion,\n  acepta_reservas = EXCLUDED.acepta_reservas,\n  created_by = EXCLUDED.created_by,\n  verified = EXCLUDED.verified,\n  updated_at = NOW()\nRETURNING id AS place_id;"
+      },
+      "notesInFlow": true,
+      "notes": "Uses Supabase Postgres credentials. Returns place_id."
+    },
+    {
+      "id": "merge-place",
+      "name": "Merge Place Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        280
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      }
+    },
+    {
+      "id": "openai-embed",
+      "name": "OpenAI Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1240,
+        400
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "responseFormat": "json",
+        "jsonParameters": true,
+        "headerParametersJson": "={{ {\"Authorization\": \"Bearer \" + $env.OPENAI_API_KEY, \"Content-Type\": \"application/json\"} }}",
+        "bodyParametersJson": "={\"model\":\"text-embedding-3-small\",\"input\":$json.embedding_text}"
+      },
+      "notesInFlow": true,
+      "notes": "Requires OPENAI_API_KEY env or replace with OpenAI credentials node."
+    },
+    {
+      "id": "merge-embedding",
+      "name": "Merge Embedding",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        280
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      }
+    },
+    {
+      "id": "build-embedding",
+      "name": "Build Embedding Insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        280
+      ],
+      "parameters": {
+        "language": "javascript",
+        "code": "const sqlJson = (v) => {\n  if (!v) return 'NULL';\n  const s = JSON.stringify(v).replace(/'/g, \"''\");\n  return `'${s}'::jsonb`;\n};\n\nreturn items.map((item) => {\n  const embedding = item.json?.data?.[0]?.embedding || item.json?.embedding || null;\n  if (!embedding) {\n    throw new Error('Missing embedding vector from OpenAI response');\n  }\n  const embeddingLiteral = `[${embedding.join(',')}]`;\n  const placeId = item.json.place_id || item.json.place?.id || null;\n  if (!placeId) {\n    throw new Error('Missing place_id for embedding insert');\n  }\n\n  return {\n    json: {\n      place_id: placeId,\n      content: item.json.embedding_text,\n      embedding_literal: `'${embeddingLiteral}'::vector`,\n      metadata_sql: sqlJson(item.json.metadata || { source_type: 'place' })\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "insert-embedding",
+      "name": "Insert Embedding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        280
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO places_embeddings (\n  content, embedding, metadata, source_type, source_id\n) VALUES (\n  {{JSON.stringify($json.content)}},\n  {{$json.embedding_literal}},\n  {{$json.metadata_sql}},\n  'place',\n  {{JSON.stringify($json.place_id)}}::uuid\n)\nRETURNING id AS embedding_id;"
+      },
+      "notesInFlow": true,
+      "notes": "Uses Supabase Postgres credentials."
+    },
+    {
+      "id": "log-summary",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        280
+      ],
+      "parameters": {
+        "language": "javascript",
+        "code": "return items.map((item) => ({\n  json: {\n    status: 'ok',\n    place_id: item.json.place_id || null,\n    embedding_id: item.json.embedding_id || null,\n    processed_at: new Date().toISOString()\n  }\n}));"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Sheets ID Present?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets ID Present?": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mock Row (Set)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Merge Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Row (Set)": {
+      "main": [
+        [
+          {
+            "node": "Merge Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Sources": {
+      "main": [
+        [
+          {
+            "node": "Normalize Place",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Place": {
+      "main": [
+        [
+          {
+            "node": "Upsert Place",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "OpenAI Embeddings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Place Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Place": {
+      "main": [
+        [
+          {
+            "node": "Merge Place Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Place Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Merge Embedding",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Embedding": {
+      "main": [
+        [
+          {
+            "node": "Build Embedding Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Embedding Insert": {
+      "main": [
+        [
+          {
+            "node": "Insert Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Embedding": {
+      "main": [
+        [
+          {
+            "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -288,9 +288,12 @@ Por ahora, los lugares en `places` no tienen embeddings asociados en `places_emb
 
 ### 4.1 Workflow de Data Ingestion
 
-1. Importa el workflow `n8n/data-ingestion-workflow.json` (opcional; no incluido en este repo por defecto)
-2. Configura las credenciales (OpenAI para embeddings, Supabase para inserción)
-3. Ejecuta manualmente el workflow para generar embeddings de los 20 lugares iniciales
+1. Importa el workflow `n8n/data-ingestion-workflow.json`
+2. Configura las credenciales (OpenAI para embeddings, Supabase Postgres para inserción)
+3. (Opcional) Configura variables de entorno en n8n:
+   - `MAISU_SHEETS_ID` y `MAISU_SHEETS_TAB` (si usas Google Sheets)
+   - `OPENAI_API_KEY` (si usas el nodo HTTP de OpenAI)
+4. Ejecuta manualmente el workflow para generar embeddings de los 20 lugares iniciales
 
 ### 4.2 Verificar Embeddings
 
@@ -366,6 +369,7 @@ OPENAI_API_KEY=[tu-api-key]
 - [ ] Expresiones vascas: 1-2 por respuesta
 - [ ] Sin errores 500 en n8n
 - [ ] Chat history se guarda en Supabase
+- [ ] Smoke test RAG ejecutado (opcional): `./scripts/rag-smoke-test.sh https://[tu-endpoint]/rag/query`
 
 ---
 
