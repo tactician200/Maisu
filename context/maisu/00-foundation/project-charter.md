@@ -14,6 +14,6 @@ Build a tourism AI MVP for Bilbao that provides reliable, local-first recommenda
 - Advanced user personalization
 
 ## Success Metrics (initial)
-- Response latency target
-- Quality/relevance target
-- Cost per conversation target
+- Response latency: p95 <= 8s for standard queries
+- Quality/relevance: >= 80% helpful rating in manual weekly review sample
+- Cost per conversation: within defined MVP budget ceiling (tracked weekly)

@@ -2,10 +2,14 @@
 
 Operational procedures for recurring tasks.
 
-Suggested runbooks:
-- GitHub access/bootstrap
-- n8n workflow restore/import
-- Supabase schema migration
-- Incident handling (webhook failures, credential rotation)
+## Available runbooks
+- `github-bootstrap-and-access.md`
+- `n8n-workflow-restore.md`
+- `supabase-schema-migration.md`
+- `incident-webhook-failures.md`
 
-Note: Tool-specific how-to can also live in dedicated skills.
+## Coverage status
+- Credential rotation runbook: pending
+- LLM provider outage fallback runbook: pending
+
+Note: tool-specific how-to can also live in dedicated skills.
