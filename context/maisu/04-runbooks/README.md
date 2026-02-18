@@ -9,6 +9,7 @@ Operational procedures for recurring tasks.
 - `incident-webhook-failures.md`
 - `fallback-decision-matrix.md`
 - `rag-smoke-test.md`
+- `daily-close-protocol.md`
 
 ## Coverage status
 - Credential rotation runbook: pending
