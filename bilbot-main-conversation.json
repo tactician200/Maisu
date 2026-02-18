@@ -1,0 +1,187 @@
+{
+  "name": "BILBOT - Guía Turístico Bilbao MVP v2",
+  "meta": {
+    "n8nWorkflowId": "cZ7MPfkpgR6RTCaN",
+    "instanceUrl": "https://tactician200.app.n8n.cloud/"
+  },
+  "nodes": [
+    {
+      "id": "chat-trigger",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [240, 304],
+      "parameters": {
+        "public": true,
+        "mode": "hostedChat",
+        "initialMessages": "Aupa! Soy Aitor, tu guia bilbaino. Preguntame lo que quieras sobre Bilbao: donde comer pintxos, que ver, historia vasca... Estoy aqui para que descubras el Bilbao de verdad, no el de las guias turisticas.",
+        "options": {
+          "title": "BILBOT - Tu Guia de Bilbao",
+          "subtitle": "Pregunta a Aitor, guia local con 20 anos de experiencia",
+          "inputPlaceholder": "Escribe tu pregunta sobre Bilbao...",
+          "responseMode": "streaming"
+        }
+      }
+    },
+    {
+      "id": "aitor-agent",
+      "name": "Aitor - AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [624, 304],
+      "parameters": {
+        "promptType": "auto",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "Eres Aitor, un guia turistico bilbaino de 45 anos con 20 anos de experiencia. Naciste y creciste en el Casco Viejo de Bilbao, jugaste al futbol amateur en categorias inferiores del Athletic Club. Tu mision: ayudar a turistas a descubrir el Bilbao real, el que conocen los locales.\n\nPERSONALIDAD:\n- Cercano, calido, ligeramente informal pero respetuoso\n- Humor ironico y sutil, muy vasco. No fuerces chistes\n- Honestidad brutal: si un lugar es caro y turistico, lo dices sin rodeos\n- Orgullo local: amas Bilbao y Euskadi con pasion\n- Pasion por lo autentico sobre lo comercial\n\nEXPRESIONES VASCAS (maximo 1-2 por respuesta, de forma natural):\n- Saludos: Aupa!, Kaixo!\n- Conversacion: Toma ya, Flipas macho, Ojo con esto, Mogollon, Pasada, Macho\n- Despedidas: Agur!, Eskerrik asko!\n\nREGLAS:\n- NUNCA inventes informacion. Si no sabes: 'Esa no la tengo controlada'\n- Advierte sobre trampas turisticas con franqueza\n- Personaliza: familia -> family-friendly, presupuesto -> economico, autenticidad -> barrio local\n- Estructura: saludo breve + respuesta directa + contexto local + consejo practico + pregunta seguimiento\n- Longitud: cortas 50-100 palabras, medias 100-200, largas 200-300 (solo si piden detalle)\n- Idiomas: ES (tutear, castellano de Bilbao), EN (adapta expresiones), EU (solo saludos)\n- Prioriza: recomendado_por_locales=true, es_trampa_turistica=false, valoracion_local>=4.5\n\nHERRAMIENTAS:\n- Bilbao Knowledge Tool: busqueda semantica de lugares, historia, cultura y recomendaciones. Usala para preguntas generales.\n- Buscar Lugares SQL: consultas SQL a la tabla 'places' para filtrar por barrio, precio_medio, tipo, valoracion_local, es_trampa_turistica, recomendado_por_locales, tipo_cocina. Usala cuando pidan comparativas, listas filtradas o datos especificos.\n\nUSO DE HERRAMIENTAS:\n- Usa la informacion de las herramientas como fuente FACTUAL. Cita nombres especificos, da precios y ubicaciones.\n- Prioriza: recomendado_por_locales=true, es_trampa_turistica=false, valoracion_local>=4.5\n- Usa SQL cuando el usuario pida filtros (barrio, precio, tipo, valoracion)\n- Usa Knowledge Tool para preguntas abiertas sobre que ver, historia, cultura\n\nEres Aitor, no un asistente corporativo. Honestidad > Complacer. Local > Turistico."
+        }
+      }
+    },
+    {
+      "id": "claude-llm",
+      "name": "Claude Sonnet 4.5 LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [464, 528],
+      "parameters": {
+        "model": "claude-sonnet-4-5-20250514",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "s6qwOwPrcr4HRmSf",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [592, 528],
+      "parameters": {
+        "contextWindowLength": 10
+      }
+    },
+    {
+      "id": "vs-tool",
+      "name": "Bilbao Knowledge Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [720, 528],
+      "parameters": {
+        "description": "lugares, restaurantes, bares de pintxos, museos, historia, cultura y recomendaciones turisticas de Bilbao",
+        "topK": 5
+      }
+    },
+    {
+      "id": "vs-llm",
+      "name": "Claude VS Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [904, 736],
+      "parameters": {
+        "model": "claude-sonnet-4-5-20250514",
+        "options": {
+          "temperature": 0.3,
+          "maxTokensToSample": 512
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "s6qwOwPrcr4HRmSf",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "supabase-vs",
+      "name": "Supabase Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [616, 736],
+      "parameters": {
+        "tableName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "places_embeddings"
+        },
+        "options": {
+          "queryName": "match_places_embeddings"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "openai-embeddings",
+      "name": "OpenAI Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [696, 944],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "postgres-tool",
+      "name": "Buscar Lugares SQL",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [1008, 528],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $fromAI(\"sql_query\", \"SQL SELECT query to search the places table. Columns: id, nombre, tipo, descripcion, direccion, barrio, precio_medio, rango_precio, valoracion_local (0-5), tags, especialidad, tipo_cocina, es_trampa_turistica (bool), recomendado_por_locales (bool), por_que_es_especial. SELECT only. Example: SELECT nombre, tipo, barrio, precio_medio, valoracion_local FROM places WHERE barrio = 'Casco Viejo' AND valoracion_local >= 4.0 ORDER BY valoracion_local DESC LIMIT 5\") }}",
+        "options": {},
+        "descriptionType": "manual",
+        "toolDescription": "Search the places database with SQL to filter restaurants, bars, museums and attractions in Bilbao by barrio, price, rating, type, cuisine, tourist trap flag, and local recommendation. Use SELECT queries only."
+      },
+      "credentials": {
+        "postgres": {
+          "id": "T7X0vRQpOny1TB7E",
+          "name": "Postgres account (Supabase)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [[{"node": "Aitor - AI Agent", "type": "main", "index": 0}]]
+    },
+    "Claude Sonnet 4.5 LLM": {
+      "ai_languageModel": [[{"node": "Aitor - AI Agent", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [[{"node": "Aitor - AI Agent", "type": "ai_memory", "index": 0}]]
+    },
+    "Bilbao Knowledge Tool": {
+      "ai_tool": [[{"node": "Aitor - AI Agent", "type": "ai_tool", "index": 0}]]
+    },
+    "Buscar Lugares SQL": {
+      "ai_tool": [[{"node": "Aitor - AI Agent", "type": "ai_tool", "index": 0}]]
+    },
+    "Claude VS Synthesizer": {
+      "ai_languageModel": [[{"node": "Bilbao Knowledge Tool", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Supabase Vector Store": {
+      "ai_vectorStore": [[{"node": "Bilbao Knowledge Tool", "type": "ai_vectorStore", "index": 0}]]
+    },
+    "OpenAI Embeddings": {
+      "ai_embedding": [[{"node": "Supabase Vector Store", "type": "ai_embedding", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
