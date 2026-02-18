@@ -186,7 +186,7 @@ SELECT expresion, significado FROM expresiones_vascas WHERE frecuencia_uso = 'mu
 
 **Opción A: Crear manualmente (recomendado para aprendizaje)**
 
-Sigue el tutorial en `n8n/README.md` para crear el workflow paso a paso.
+Sigue el tutorial en `README.md` y `docs/n8n-workflows-guide.md` para crear el workflow paso a paso.
 
 **Opción B: Importar JSON (más rápido)**
 
@@ -288,7 +288,7 @@ Por ahora, los lugares en `places` no tienen embeddings asociados en `places_emb
 
 ### 4.1 Workflow de Data Ingestion
 
-1. Importa el workflow `n8n/data-ingestion-workflow.json`
+1. Importa el workflow `n8n/data-ingestion-workflow.json` (opcional; no incluido en este repo por defecto)
 2. Configura las credenciales (OpenAI para embeddings, Supabase para inserción)
 3. Ejecuta manualmente el workflow para generar embeddings de los 20 lugares iniciales
 
