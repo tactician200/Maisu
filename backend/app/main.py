@@ -60,6 +60,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "query": ["query", "chatInput"],
                 "session_id": ["session_id", "sessionId"],
                 "lang": ["lang"],
+                "tone": ["tone"],
+                "style": ["style"],
+                "interests": ["interests"],
             },
             "detail": jsonable_encoder(exc.errors()),
         },
@@ -71,22 +74,42 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
     started = time.perf_counter()
     docs = retrieve_documents(query=request.query, top_k=3)
 
+    context = user_context_store.get_context(request.session_id) if request.session_id else None
+    context_preferences = normalize_preferences(context.get("preferences") if context else None)
+
     effective_lang = _normalize_lang_preference(request.lang)
-    if not effective_lang and request.session_id:
-        context = user_context_store.get_context(request.session_id)
-        if context:
-            candidate_lang = context.get("language")
-            effective_lang = _normalize_lang_preference(candidate_lang if isinstance(candidate_lang, str) else None)
+    if not effective_lang and context:
+        candidate_lang = context.get("language")
+        effective_lang = _normalize_lang_preference(candidate_lang if isinstance(candidate_lang, str) else None)
+
+    default_preferences = {"tone": "concise", "style": "paragraph", "interests": []}
+    effective_tone = request.tone or context_preferences.get("tone") or default_preferences["tone"]
+    effective_style = request.style or context_preferences.get("style") or default_preferences["style"]
+    effective_interests = request.interests or context_preferences.get("interests") or default_preferences["interests"]
 
     fallback_used = False
     provider_name = "openai"
 
     try:
-        result = await provider.generate(query=request.query, documents=docs, lang=effective_lang)
+        result = await provider.generate(
+            query=request.query,
+            documents=docs,
+            lang=effective_lang,
+            tone=effective_tone,
+            style=effective_style,
+            interests=effective_interests,
+        )
         answer = result.answer
         provider_name = result.provider
     except ProviderError:
-        answer = build_fallback_answer(query=request.query, documents=docs, lang=effective_lang)
+        answer = build_fallback_answer(
+            query=request.query,
+            documents=docs,
+            lang=effective_lang,
+            tone=effective_tone,
+            style=effective_style,
+            interests=effective_interests,
+        )
         fallback_used = True
         provider_name = "fallback"
 
