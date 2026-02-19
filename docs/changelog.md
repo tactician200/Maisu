@@ -8,6 +8,7 @@
 - Final integration validation: backend test suite passing (`20 passed`).
 - Integrated personalization v2 delivery: `/rag/query` now enforces request > stored-context > default precedence for tone/style/interests, with guardrail tests and an ops runbook for verification/rollback.
 - Tuned retrieval relevance/citation quality with tokenized matching, deterministic scoring/order, optional history-table blend for historical queries, and added regression coverage (`27 passed`).
+- Captured onboarding/personalization MVP product direction (full personalization + dynamic conversational onboarding) in `docs/onboarding-personalization-mvp.md`.
 
 ## 2026-02-18
 - Reorganized repository structure (`docs/`, `n8n/`, `database/`, `scripts/`)
