@@ -96,6 +96,11 @@ Example: empty `query`:
 - Current endpoint calls retrieval with fixed `top_k=3`.
 - Retrieval may use Supabase when configured; if unavailable/error/empty, runtime falls back to bundled mock documents, so citations are usually non-empty.
 
+#### Router visibility (v1)
+- SQL/RAG/Hybrid route selection is handled upstream (conversation orchestration/tool-use layer), not inside `/rag/query`.
+- Therefore this API contract does not expose `route_type`, route confidence, or route trace.
+- Operational implication: validate routing from orchestrator logs/observability, not from this endpoint response alone.
+
 ## QA acceptance checklist (compact)
 
 - [ ] `POST /rag/query` with valid body returns `200` and keys: `answer`, `citations`, `latency_ms`, `fallback_used`, `provider`.

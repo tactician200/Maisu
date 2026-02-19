@@ -87,6 +87,39 @@ This describes the live behavior implemented in `backend/app/main.py`, `retrieva
 - Because retrieval has mock fallback, citation arrays are typically non-empty even during provider failures.
 - Endpoint does **not** expose `top_k` in request schema; it is fixed internally at 3 for now.
 
+## Router v1 (SQL/RAG/Hybrid) behavior
+
+`/rag/query` itself always executes the same backend pipeline (retrieve docs + generate/fallback). Query routing decisions for SQL vs RAG vs Hybrid are made in the conversational layer (n8n agent/tool selection), not by the FastAPI endpoint.
+
+### Route types
+
+- **Structured route (`structured`)**: factual/filtered requests where tabular fields dominate (e.g., neighborhood, budget, opening hours, “top N”).
+- **Narrative route (`narrative`)**: explanatory/open-ended requests (history, culture, context, storytelling, comparisons with nuance).
+- **Mixed route (`mixed`)**: requests combining constraints + explanation (e.g., “3 bars in Casco Viejo and explain why each”).
+
+### Decision rules (high-level, v1)
+
+- If the user intent is primarily **lookup/filter/list**, prefer **structured** (SQL tool first).
+- If intent is primarily **explain/describe/contextualize**, prefer **narrative** (RAG/vector retrieval first).
+- If both are explicit in one prompt, prefer **mixed** (combine SQL facts + RAG context, then synthesize).
+- On uncertainty, v1 tends to start with one tool and may or may not call the second tool depending on LLM judgment.
+
+### Behavior per route
+
+| Route | Primary source | Typical output | Strengths | Failure pattern |
+|---|---|---|---|---|
+| `structured` | SQL (`places`-style fields) | concise lists, filters, attributes | precision on explicit constraints | thin cultural/context detail |
+| `narrative` | RAG/vector + generated synthesis | explanatory paragraphs/bullets | richer context and storytelling | may miss hard constraints/counts |
+| `mixed` | SQL + RAG + synthesis | ranked/curated list with rationale | best balance of precision + context | higher latency, occasional tool under-use |
+
+### Known limitations (v1)
+
+- Route choice is **implicit** (LLM/tool-use behavior), not an explicit deterministic classifier.
+- No route label is returned in API responses (`QueryResponse` has no `route_type` field).
+- Mixed queries can degrade to single-route behavior if the agent decides to call only one tool.
+- No confidence score/trace for route decisions in public contract.
+- SQL and RAG retrieval can diverge in coverage/recency, yielding occasional inconsistency between facts and narrative.
+
 ## QA acceptance checklist (compact)
 
 - [ ] Invalid body (`{}`) returns `422` with `detail` array and missing `query` location.
