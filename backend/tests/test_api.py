@@ -258,3 +258,88 @@ def test_rag_query_explicit_lang_overrides_stored_language(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert observed["lang"] == "es"
+
+
+def test_personalization_stored_preference_shapes_response_without_explicit_override(monkeypatch) -> None:
+    observed: dict[str, str | None] = {}
+
+    monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "en"})
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None) -> ProviderResult:
+        observed["lang"] = lang
+        return ProviderResult(answer="English response", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Best walk", "session_id": "sess-pref"})
+
+    assert response.status_code == 200
+    assert observed["lang"] == "en"
+
+
+def test_personalization_explicit_preference_overrides_stored(monkeypatch) -> None:
+    observed: dict[str, str | None] = {}
+
+    monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "en"})
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None) -> ProviderResult:
+        observed["lang"] = lang
+        return ProviderResult(answer="Respuesta", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Mejor paseo", "session_id": "sess-pref", "lang": "es"})
+
+    assert response.status_code == 200
+    assert observed["lang"] == "es"
+
+
+def test_personalization_invalid_stored_preference_defaults_safely(monkeypatch) -> None:
+    observed: dict[str, str | None] = {}
+
+    monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "pirate"})
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None) -> ProviderResult:
+        observed["lang"] = lang
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan", "session_id": "sess-invalid-pref"})
+
+    assert response.status_code == 200
+    assert observed["lang"] is None
+
+
+def test_personalization_citations_invariants_hold(monkeypatch) -> None:
+    docs = [
+        {
+            "id": "p1",
+            "title": "Guggenheim",
+            "snippet": "Museo junto a la ría",
+            "source": "supabase://places/p1",
+        },
+        {
+            "id": "p2",
+            "title": "Azkuna Zentroa",
+            "snippet": "Centro cultural en Indautxu",
+            "source": "supabase://places/p2",
+        },
+    ]
+
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
+    monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "en"})
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None) -> ProviderResult:
+        return ProviderResult(answer=f"lang={lang}", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan", "session_id": "sess-citations"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "openai"
+    assert data["fallback_used"] is False
+    assert data["citations"] == docs
+    assert all(item["id"] and item["source"] for item in data["citations"])
