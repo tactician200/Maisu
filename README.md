@@ -8,6 +8,7 @@ Chatbot turístico con personalidad local vasca usando **n8n + Supabase + Claude
    - `database/schema.sql`
    - `database/seed-data.sql`
    - `database/expresiones-vascas.sql`
+   - `database/user_context.sql` (personalización por sesión/usuario)
 2. Importa workflow principal en n8n:
    - `n8n/bilbot-main-conversation.json`
 3. (Opcional) Importa workflow de data ingestion:
@@ -67,7 +68,8 @@ Guía detallada: **`SETUP.md`**
 ├── database/
 │   ├── schema.sql
 │   ├── seed-data.sql
-│   └── expresiones-vascas.sql
+│   ├── expresiones-vascas.sql
+│   └── user_context.sql
 └── scripts/
     └── test-webhook.sh
     └── rag-smoke-test.sh
@@ -82,6 +84,43 @@ Guía detallada: **`SETUP.md`**
 - Documento de producto / arquitectura MVP: `docs/bilbot-proyecto-mvp.md`
 - Prompt del asistente (Aitor): `docs/system-prompt-aitor.md`
 - Guía extendida de workflow n8n: `docs/n8n-workflows-guide.md`
+
+### Personalización: `database/user_context.sql`
+
+**Propósito**
+- Guardar metadatos mínimos de personalización por sesión para adaptar respuestas (nombre, idioma y preferencias ligeras).
+
+**Suposiciones de entorno**
+- PostgreSQL 14+ (compatible con Supabase).
+- Esquema `public` activo.
+- Permisos para crear tabla, índices, función y trigger.
+
+**Ejemplos de consultas**
+
+```sql
+-- Upsert de contexto por sesión
+INSERT INTO public.user_context (session_id, user_id, name, language, preferences)
+VALUES ('session-123', NULL, 'Ane', 'es', '{"tone":"friendly","likes":["pintxos"]}'::jsonb)
+ON CONFLICT (session_id)
+DO UPDATE SET
+  user_id = EXCLUDED.user_id,
+  name = EXCLUDED.name,
+  language = EXCLUDED.language,
+  preferences = EXCLUDED.preferences;
+
+-- Leer contexto para personalizar una respuesta
+SELECT session_id, user_id, name, language, preferences, updated_at
+FROM public.user_context
+WHERE session_id = 'session-123';
+
+-- Buscar sesiones con preferencia concreta
+SELECT session_id, preferences
+FROM public.user_context
+WHERE preferences ? 'tone';
+```
+
+**Privacidad**
+- Almacenar solo metadatos de personalización (no PII sensible, no contenido completo de conversaciones).
 
 ---
 
