@@ -6,6 +6,7 @@
 - Added minimal `historia_vasca` embeddings ingestion path and regression coverage.
 - Added personalization user-context delivery: API endpoint, SQL table schema, and language fallback behavior.
 - Final integration validation: backend test suite passing (`20 passed`).
+- Integrated personalization v2 delivery: `/rag/query` now enforces request > stored-context > default precedence for tone/style/interests, with guardrail tests and an ops runbook for verification/rollback.
 
 ## 2026-02-18
 - Reorganized repository structure (`docs/`, `n8n/`, `database/`, `scripts/`)
