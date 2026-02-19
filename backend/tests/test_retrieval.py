@@ -124,7 +124,10 @@ def test_supabase_retrieval_places_defaults_remain_intact(monkeypatch) -> None:
     assert captured["params"] == {
         "select": "id,nombre,descripcion,slug",
         "limit": 2,
-        "or": "nombre.ilike.%2Acasco%2A,descripcion.ilike.%2Acasco%2A",
+        "or": (
+            "nombre.ilike.%2Acasco%2A,descripcion.ilike.%2Acasco%2A,"
+            "title.ilike.%2Acasco%2A,snippet.ilike.%2Acasco%2A"
+        ),
     }
     assert docs[0]["source"] == "casco-viejo"
 
@@ -150,3 +153,118 @@ def test_retrieve_documents_history_source_empty_is_graceful(monkeypatch) -> Non
 
     assert len(docs) == 2
     assert docs[0]["id"] == "mock-1"
+
+
+def test_historical_query_balances_places_and_history(monkeypatch) -> None:
+    monkeypatch.setenv("SUPABASE_HISTORY_TABLE", "history")
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        def json(self):
+            return self._payload
+
+    def fake_get(self, url, headers=None, params=None):
+        if url.endswith("/places"):
+            return FakeResponse(
+                [
+                    {
+                        "id": "p1",
+                        "nombre": "Casco Viejo",
+                        "descripcion": "Barrio con plazas y bares.",
+                        "slug": "casco-viejo",
+                    }
+                ]
+            )
+        if url.endswith("/history"):
+            return FakeResponse(
+                [
+                    {
+                        "id": "h1",
+                        "title": "Historia del Casco Viejo",
+                        "snippet": "Origen medieval de Bilbao y sus siete calles.",
+                        "source": "history://casco-viejo",
+                    }
+                ]
+            )
+        return FakeResponse([])
+
+    monkeypatch.setattr(httpx.Client, "get", fake_get)
+
+    docs = retrieval._supabase_retrieval(
+        query="historia del casco viejo",
+        top_k=2,
+        supabase_url="https://example.supabase.co",
+        supabase_key="test-key",
+    )
+
+    assert [doc["id"] for doc in docs] == ["h1", "p1"]
+
+
+def test_stable_ordering_and_snippet_normalization(monkeypatch) -> None:
+    class FakeResponse:
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        @staticmethod
+        def json():
+            return [
+                {
+                    "id": "b",
+                    "title": "B title",
+                    "snippet": "  same    words   ",
+                    "source": "s2",
+                },
+                {
+                    "id": "a",
+                    "title": "A title",
+                    "snippet": "same words",
+                    "source": "s1",
+                },
+            ]
+
+    monkeypatch.setattr(httpx.Client, "get", lambda *args, **kwargs: FakeResponse())
+
+    docs = retrieval._supabase_retrieval(
+        query="none",
+        top_k=2,
+        supabase_url="https://example.supabase.co",
+        supabase_key="test-key",
+    )
+
+    assert [doc["id"] for doc in docs] == ["a", "b"]
+    assert docs[0]["snippet"] == "same words"
+
+
+def test_missing_source_uses_deterministic_fallback(monkeypatch) -> None:
+    class FakeResponse:
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        @staticmethod
+        def json():
+            return [
+                {
+                    "id": "h2",
+                    "title": "Bilbao industrial",
+                    "snippet": "Transformación de la ría.",
+                }
+            ]
+
+    monkeypatch.setattr(httpx.Client, "get", lambda *args, **kwargs: FakeResponse())
+
+    docs = retrieval._supabase_retrieval(
+        query="historia bilbao",
+        top_k=1,
+        supabase_url="https://example.supabase.co",
+        supabase_key="test-key",
+    )
+
+    assert docs[0]["source"] == "supabase://places/h2"

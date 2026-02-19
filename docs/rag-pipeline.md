@@ -14,7 +14,10 @@ This describes the live behavior implemented in `backend/app/main.py`, `retrieva
    - Retrieval behavior:
      - If Supabase env vars are missing (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) ⇒ return mock docs.
      - If Supabase request errors or returns empty list ⇒ return mock docs.
-     - If Supabase returns rows, rows are normalized into citation shape (`id/title/snippet/source`).
+     - Query text is tokenized and matched against `nombre/descripcion/title/snippet` to improve lexical recall.
+     - Results are scored deterministically (phrase + token matches, with optional historical boost).
+     - If `SUPABASE_HISTORY_TABLE` is configured, retrieval also queries that table and can interleave history/place citations for history-oriented queries.
+     - Rows are normalized into citation shape (`id/title/snippet/source`) with stable tie-break ordering.
 
 3. **Generate answer (provider path)**
    - Tries `OpenAIProvider.generate(query, documents, lang)`.
