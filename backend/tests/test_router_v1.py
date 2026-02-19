@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app, provider
-from app.providers import ProviderResult
+from app.providers import ProviderError, ProviderResult
 from app.router import classify_query_route
 
 client = TestClient(app)
@@ -109,3 +109,23 @@ def test_router_v1_classifier_detects_hybrid_query() -> None:
 
 def test_router_v1_classifier_low_confidence_defaults_to_narrative() -> None:
     assert classify_query_route("Bilbao") == "narrative"
+
+
+def test_router_v1_output_invariants_hold_on_fallback(monkeypatch) -> None:
+    docs = [{"id": "p1", "title": "A", "snippet": "B", "source": "mock://p1"}]
+
+    async def fail_generate(*args, **kwargs):
+        raise ProviderError("provider down")
+
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "narrative")
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
+    monkeypatch.setattr(provider, "generate", fail_generate)
+
+    response = client.post("/rag/query", json={"query": "A narrative question"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert {"answer", "citations", "provider", "fallback_used"}.issubset(body.keys())
+    assert body["citations"] == docs
+    assert body["provider"] == "fallback"
+    assert body["fallback_used"] is True
