@@ -1,10 +1,11 @@
 # Maisu Changelog
 
 ## 2026-02-19
-- Integrated RAG validation hardening for `/rag/query` (strict payload checks + structured 422 response guidance).
-- Aligned API/RAG contract docs to current runtime request/response behavior and accepted alias fields.
-- Added ingestion readiness audit with prioritized gaps and follow-up actions.
-- Verified integration with backend test suite (`9 passed`) and API validation smoke script.
+- Hardened `/rag/query` validation and aligned contracts/docs with current runtime behavior.
+- Added ingestion audit artifacts: execution runbook and SQL verifier script for checks/rollback.
+- Added minimal `historia_vasca` embeddings ingestion path and regression coverage.
+- Added personalization user-context delivery: API endpoint, SQL table schema, and language fallback behavior.
+- Final integration validation: backend test suite passing (`20 passed`).
 
 ## 2026-02-18
 - Reorganized repository structure (`docs/`, `n8n/`, `database/`, `scripts/`)
