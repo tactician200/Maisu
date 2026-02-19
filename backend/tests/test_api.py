@@ -84,3 +84,48 @@ def test_rag_query_fallback_path(monkeypatch) -> None:
     assert data["provider"] == "fallback"
     assert "1) Resumen" in data["answer"]
     assert data["citations"] == docs
+
+
+def test_rag_query_citations_invariant_across_provider_paths(monkeypatch) -> None:
+    docs = [
+        {
+            "id": "p1",
+            "title": "Guggenheim",
+            "snippet": "Museo junto a la ría",
+            "source": "supabase://places/p1",
+        },
+        {
+            "id": "h1",
+            "title": "Historia de Bilbao",
+            "snippet": "Origen medieval y expansión portuaria",
+            "source": "supabase://history/h1",
+        },
+    ]
+
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
+
+    async def ok_generate(query: str, documents: list[dict], lang: str | None = None) -> ProviderResult:
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", ok_generate)
+    ok_response = client.post("/rag/query", json={"query": "historia y arte"})
+
+    assert ok_response.status_code == 200
+    ok_data = ok_response.json()
+    assert ok_data["fallback_used"] is False
+    assert ok_data["provider"] == "openai"
+    assert ok_data["citations"] == docs
+    assert all(c["source"] for c in ok_data["citations"])
+
+    async def fail_generate(query: str, documents: list[dict], lang: str | None = None):
+        raise ProviderError("down")
+
+    monkeypatch.setattr(provider, "generate", fail_generate)
+    fb_response = client.post("/rag/query", json={"query": "historia y arte"})
+
+    assert fb_response.status_code == 200
+    fb_data = fb_response.json()
+    assert fb_data["fallback_used"] is True
+    assert fb_data["provider"] == "fallback"
+    assert fb_data["citations"] == docs
+    assert all(c["source"] for c in fb_data["citations"])
