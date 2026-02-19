@@ -10,6 +10,7 @@
 - Tuned retrieval relevance/citation quality with tokenized matching, deterministic scoring/order, optional history-table blend for historical queries, and added regression coverage (`27 passed`).
 - Captured onboarding/personalization MVP product direction (full personalization + dynamic conversational onboarding) in `docs/onboarding-personalization-mvp.md`.
 - Added product decisions: data-policy deferred, strict-vs-narrative answer rule by data type, and phased launch sequence (friends/family → internal commercial rep → tourism authorities).
+- Added conversational onboarding ruleset in `docs/onboarding-conversational-rules.md` (critical/contextual/inferred data model + phased collection + UX constraints).
 
 ## 2026-02-18
 - Reorganized repository structure (`docs/`, `n8n/`, `database/`, `scripts/`)
