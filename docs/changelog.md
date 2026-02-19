@@ -9,6 +9,7 @@
 - Integrated personalization v2 delivery: `/rag/query` now enforces request > stored-context > default precedence for tone/style/interests, with guardrail tests and an ops runbook for verification/rollback.
 - Tuned retrieval relevance/citation quality with tokenized matching, deterministic scoring/order, optional history-table blend for historical queries, and added regression coverage (`27 passed`).
 - Captured onboarding/personalization MVP product direction (full personalization + dynamic conversational onboarding) in `docs/onboarding-personalization-mvp.md`.
+- Added product decisions: data-policy deferred, strict-vs-narrative answer rule by data type, and phased launch sequence (friends/family → internal commercial rep → tourism authorities).
 
 ## 2026-02-18
 - Reorganized repository structure (`docs/`, `n8n/`, `database/`, `scripts/`)

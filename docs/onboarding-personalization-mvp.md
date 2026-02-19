@@ -8,6 +8,14 @@ We will implement **full personalization** for Bilbot, including a **conversatio
 
 Goal: collect high-impact profile data with minimal friction (not a long questionnaire), using dynamic questioning + inference from conversation.
 
+Additional product decisions (2026-02-19):
+- **Data policy:** deferred for a later dedicated policy phase.
+- **Answer strictness:** use strict factual mode for exact fields (e.g., address/location/place details) and narrative mode for historical/cultural explanations.
+- **Launch sequence:**
+  1. Friends & family pilot
+  2. Internal commercial representative enablement (internal selling point)
+  3. Basque tourism authorities showcase
+
 ---
 
 ## 1) Perfil Básico (critical)
