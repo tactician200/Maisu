@@ -30,6 +30,36 @@ def test_rag_query_happy_path(monkeypatch) -> None:
     assert isinstance(data["citations"], list)
 
 
+def test_rag_query_accepts_chatinput_alias(monkeypatch) -> None:
+    observed: dict[str, str | None] = {}
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None) -> ProviderResult:
+        observed["query"] = query
+        observed["lang"] = lang
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post(
+        "/rag/query",
+        json={"chatInput": "  Hola Bilbao  ", "sessionId": "abc", "lang": " ES "},
+    )
+
+    assert response.status_code == 200
+    assert observed["query"] == "Hola Bilbao"
+    assert observed["lang"] == "es"
+
+
+def test_rag_query_rejects_blank_query() -> None:
+    response = client.post("/rag/query", json={"query": "   "})
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["error"] == "invalid_request"
+    assert "accepted_fields" in data
+    assert data["accepted_fields"]["query"] == ["query", "chatInput"]
+
+
 def test_rag_query_fallback_path(monkeypatch) -> None:
     async def failing_generate(query: str, documents: list[dict], lang: str | None = None):
         raise ProviderError("rate limited")

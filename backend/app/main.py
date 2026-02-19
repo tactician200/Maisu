@@ -1,6 +1,9 @@
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.providers import OpenAIProvider, ProviderError, build_fallback_answer
 from app.retrieval import retrieve_documents
@@ -13,6 +16,26 @@ provider = OpenAIProvider()
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    if request.url.path != "/rag/query":
+        return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "invalid_request",
+            "message": "Invalid payload for /rag/query. Provide at least a non-empty 'query' field.",
+            "accepted_fields": {
+                "query": ["query", "chatInput"],
+                "session_id": ["session_id", "sessionId"],
+                "lang": ["lang"],
+            },
+            "detail": jsonable_encoder(exc.errors()),
+        },
+    )
 
 
 @app.post("/rag/query", response_model=QueryResponse)
