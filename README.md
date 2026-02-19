@@ -92,7 +92,7 @@ Incluye:
 - Workflow principal de conversación
 - Prompt y documentación de producto
 - Script de test para webhook
-- Workflow de data ingestion (places + embeddings)
+- Workflow de data ingestion (places + historia_vasca + embeddings)
 - Backend FastAPI mínimo para endpoint `/rag/query` con fallback
 
 ---

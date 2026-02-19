@@ -1,6 +1,6 @@
 # MAISU Ingestion Runbook (Execute in <30 min)
 
-**Goal:** Run ingestion now and close the main audit gap: **`places` coverage must match `places_embeddings` coverage** (and explicitly check `historia_vasca` has no embedding path yet).
+**Goal:** Run ingestion now and verify both coverage gates: **`places` and `historia_vasca` must be represented in `places_embeddings`** (`source_type='place'` and `source_type='history'`).
 
 ## 1) Prerequisites / env vars
 
@@ -72,7 +72,7 @@ SELECT
   (SELECT COUNT(*) FROM places_embeddings WHERE source_type = 'history') AS history_embeddings_count;
 ```
 
-**Pass criteria (today):** `place_embeddings_count >= places_count`
+**Pass criteria:** `place_embeddings_count >= places_count` **and** (`historia_count = 0` or `history_embeddings_count > 0`).
 
 ### 3.2 Direct gap list (places without embedding)
 
@@ -122,7 +122,7 @@ SELECT
 FROM historia_vasca;
 ```
 
-If `historia_rows > 0` and `historia_embeddings = 0`, gap remains open (expected with current workflow).
+If `historia_rows > 0` and `historia_embeddings = 0`, ingestion did not populate history embeddings and should be treated as failed coverage.
 
 ### 3.6 One-command verification (read-only)
 
@@ -181,7 +181,7 @@ TRUNCATE TABLE places RESTART IDENTITY CASCADE;
 - [ ] Gap query shows **0 places missing embeddings**
 - [ ] Duplicate check reviewed (or accepted with reason)
 - [ ] Spot-check query confirms recent rows are correct
-- [ ] `historia_vasca` vs `source_type='history'` status recorded (known current gap)
+- [ ] `historia_vasca` vs `source_type='history'` status recorded (coverage confirmed)
 - [ ] Rollback SQL window prepared and tested (dry-run by SELECT)
 - [ ] Monitoring owner assigned for next scheduled run
 - [ ] Backend owner informed if `fallback_used=true` observed in API logs

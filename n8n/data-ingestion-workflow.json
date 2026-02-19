@@ -294,6 +294,99 @@
         "language": "javascript",
         "code": "return items.map((item) => ({\n  json: {\n    status: 'ok',\n    place_id: item.json.place_id || null,\n    embedding_id: item.json.embedding_id || null,\n    processed_at: new Date().toISOString()\n  }\n}));"
       }
+    },
+    {
+      "id": "fetch-history",
+      "name": "Fetch Historia Vasca",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        600,
+        560
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, tema, titulo, contenido, contenido_corto, epoca, categoria, tags, nivel_detalle, idioma, updated_at FROM historia_vasca ORDER BY updated_at DESC;"
+      },
+      "notesInFlow": true,
+      "notes": "Loads historia_vasca rows to generate source_type='history' embeddings."
+    },
+    {
+      "id": "normalize-history",
+      "name": "Normalize History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        560
+      ],
+      "parameters": {
+        "language": "javascript",
+        "code": "const safeString = (v) => (v === null || v === undefined ? '' : String(v).trim());\nconst parseList = (v) => {\n  if (v === null || v === undefined || v === '') return [];\n  if (Array.isArray(v)) return v.map((i) => safeString(i)).filter(Boolean);\n  return String(v).split(',').map((i) => safeString(i)).filter(Boolean);\n};\n\nreturn items.map((item) => {\n  const src = item.json || {};\n  const tags = parseList(src.tags);\n  const embeddingText = [\n    safeString(src.tema),\n    safeString(src.titulo),\n    safeString(src.contenido_corto),\n    safeString(src.contenido),\n    safeString(src.epoca),\n    safeString(src.categoria),\n    tags.join(', '),\n    safeString(src.nivel_detalle),\n    safeString(src.idioma)\n  ].filter(Boolean).join(' | ');\n\n  return {\n    json: {\n      history_id: safeString(src.id),\n      embedding_text: embeddingText,\n      metadata: {\n        source_type: 'history',\n        history_id: safeString(src.id),\n        tema: safeString(src.tema) || null,\n        titulo: safeString(src.titulo) || null,\n        epoca: safeString(src.epoca) || null,\n        categoria: safeString(src.categoria) || null,\n        tags\n      }\n    }\n  };\n}).filter((item) => item.json.history_id && item.json.embedding_text);"
+      }
+    },
+    {
+      "id": "openai-embed-history",
+      "name": "OpenAI Embeddings (History)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1040,
+        680
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "responseFormat": "json",
+        "jsonParameters": true,
+        "headerParametersJson": "={{ {\"Authorization\": \"Bearer \" + $env.OPENAI_API_KEY, \"Content-Type\": \"application/json\"} }}",
+        "bodyParametersJson": "={\"model\":\"text-embedding-3-small\",\"input\":$json.embedding_text}"
+      },
+      "notesInFlow": true,
+      "notes": "Embeddings for historia_vasca rows (source_type=history)."
+    },
+    {
+      "id": "merge-history-embedding",
+      "name": "Merge History Embedding",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        560
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      }
+    },
+    {
+      "id": "build-history-embedding",
+      "name": "Build History Embedding Insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        560
+      ],
+      "parameters": {
+        "language": "javascript",
+        "code": "const sqlJson = (v) => {\n  if (!v) return 'NULL';\n  const s = JSON.stringify(v).replace(/'/g, \"''\");\n  return `'${s}'::jsonb`;\n};\n\nreturn items.map((item) => {\n  const embedding = item.json?.data?.[0]?.embedding || item.json?.embedding || null;\n  if (!embedding) throw new Error('Missing history embedding vector from OpenAI response');\n  const historyId = item.json.history_id || item.json.metadata?.history_id || null;\n  if (!historyId) throw new Error('Missing history_id for embedding insert');\n\n  return {\n    json: {\n      history_id: historyId,\n      content: item.json.embedding_text,\n      embedding_literal: `'[${embedding.join(',')}]'::vector`,\n      metadata_sql: sqlJson(item.json.metadata || { source_type: 'history', history_id: historyId })\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "insert-history-embedding",
+      "name": "Insert History Embedding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        560
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH deleted AS (\n  DELETE FROM places_embeddings\n  WHERE source_type = 'history'\n    AND metadata->>'history_id' = {{JSON.stringify($json.history_id)}}\n)\nINSERT INTO places_embeddings (\n  content, embedding, metadata, source_type, source_id\n) VALUES (\n  {{JSON.stringify($json.content)}},\n  {{$json.embedding_literal}},\n  {{$json.metadata_sql}},\n  'history',\n  NULL\n)\nRETURNING id AS embedding_id;"
+      },
+      "notesInFlow": true,
+      "notes": "Keeps one current embedding per historia_vasca row using metadata.history_id."
     }
   ],
   "connections": {
@@ -302,6 +395,11 @@
         [
           {
             "node": "Sheets ID Present?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Historia Vasca",
             "type": "main",
             "index": 0
           }
@@ -440,6 +538,66 @@
         [
           {
             "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Historia Vasca": {
+      "main": [
+        [
+          {
+            "node": "Normalize History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize History": {
+      "main": [
+        [
+          {
+            "node": "Merge History Embedding",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "OpenAI Embeddings (History)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embeddings (History)": {
+      "main": [
+        [
+          {
+            "node": "Merge History Embedding",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge History Embedding": {
+      "main": [
+        [
+          {
+            "node": "Build History Embedding Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build History Embedding Insert": {
+      "main": [
+        [
+          {
+            "node": "Insert History Embedding",
             "type": "main",
             "index": 0
           }
