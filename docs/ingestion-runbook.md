@@ -124,6 +124,22 @@ FROM historia_vasca;
 
 If `historia_rows > 0` and `historia_embeddings = 0`, gap remains open (expected with current workflow).
 
+### 3.6 One-command verification (read-only)
+
+Use the helper script to run the key checks above in one command and print a compact summary.
+
+```bash
+SUPABASE_DB_URL='postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require' \
+  ./scripts/verify-ingestion-sql.sh
+```
+
+Behavior and assumptions:
+- Uses `SUPABASE_DB_URL` (or `DATABASE_URL` fallback).
+- Requires local `psql` in PATH.
+- Runs inside a `READ ONLY` transaction and executes `SELECT` checks only.
+- Exit code `0` when core checks pass; exit code `2` when coverage/missing/duplicate checks fail.
+- History gap is reported as indicator (`OK` / `GAP`) and does not fail the script by itself.
+
 ---
 
 ## 4) Rollback steps
