@@ -6,7 +6,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.providers import OpenAIProvider, ProviderError, build_fallback_answer
-from app.retrieval import retrieve_documents
+from app.retrieval import retrieve_documents, retrieve_sql_facts
+from app.router import classify_query_route
 from app.schemas import QueryRequest, QueryResponse, UserContextResponse, UserContextUpsertRequest
 from app.user_context import UserContextStore, normalize_preferences
 
@@ -72,7 +73,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.post("/rag/query", response_model=QueryResponse)
 async def rag_query(request: QueryRequest) -> QueryResponse:
     started = time.perf_counter()
-    docs = retrieve_documents(query=request.query, top_k=3)
+    route = classify_query_route(request.query)
+
+    if route == "structured":
+        docs = retrieve_sql_facts(query=request.query, top_k=3)
+    elif route == "hybrid":
+        sql_docs = retrieve_sql_facts(query=request.query, top_k=2)
+        rag_docs = retrieve_documents(query=request.query, top_k=3)
+        docs = []
+        seen_sources: set[str] = set()
+        for doc in [*sql_docs, *rag_docs]:
+            source = str(doc.get("source") or doc.get("id") or "")
+            if source in seen_sources:
+                continue
+            seen_sources.add(source)
+            docs.append(doc)
+            if len(docs) >= 3:
+                break
+    else:
+        docs = retrieve_documents(query=request.query, top_k=3)
 
     context = user_context_store.get_context(request.session_id) if request.session_id else None
     context_preferences = normalize_preferences(context.get("preferences") if context else None)

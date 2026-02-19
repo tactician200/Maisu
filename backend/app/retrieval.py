@@ -61,6 +61,25 @@ def retrieve_documents(query: str, top_k: int = 3) -> list[dict[str, Any]]:
         return _mock_docs(top_k=top_k)
 
 
+def retrieve_sql_facts(query: str, top_k: int = 3) -> list[dict[str, Any]]:
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not supabase_url or not supabase_key:
+        return _mock_docs(top_k=top_k)
+
+    try:
+        docs = _supabase_structured_retrieval(
+            query=query,
+            top_k=top_k,
+            supabase_url=supabase_url,
+            supabase_key=supabase_key,
+        )
+        return docs if docs else _mock_docs(top_k=top_k)
+    except Exception:
+        return _mock_docs(top_k=top_k)
+
+
 def _mock_docs(top_k: int) -> list[dict[str, Any]]:
     return DEFAULT_DOCS[:top_k]
 
@@ -203,6 +222,44 @@ def _fetch_rows(
     return [row for row in payload if isinstance(row, dict)]
 
 
+def _collect_fact_fields(row: dict[str, Any]) -> list[str]:
+    field_candidates = [
+        ("direccion", "Dirección"),
+        ("address", "Address"),
+        ("horario", "Horario"),
+        ("opening_hours", "Horario"),
+        ("price", "Precio"),
+        ("precio", "Precio"),
+        ("category", "Categoría"),
+        ("categoria", "Categoría"),
+        ("website", "Web"),
+        ("web", "Web"),
+    ]
+    details: list[str] = []
+    seen_labels: set[str] = set()
+    for key, label in field_candidates:
+        value = row.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text or label in seen_labels:
+            continue
+        seen_labels.add(label)
+        details.append(f"{label}: {text}")
+    return details
+
+
+def _normalize_structured_row(row: dict[str, Any], *, table: str) -> dict[str, Any] | None:
+    normalized = _normalize_row(row, table=table)
+    if not normalized:
+        return None
+
+    details = _collect_fact_fields(row)
+    if details:
+        normalized["snippet"] = " · ".join(details[:3])
+    return normalized
+
+
 def _supabase_retrieval(
     query: str,
     top_k: int,
@@ -276,6 +333,79 @@ def _supabase_retrieval(
                 candidates.append((score, idx + limit, normalized))
 
     # Deterministic ranking by relevance, then title/id as stable tie-breakers.
+    ranked = sorted(
+        candidates,
+        key=lambda item: (
+            -item[0],
+            item[2]["title"].lower(),
+            item[2]["id"],
+            item[1],
+        ),
+    )
+
+    docs: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for _, _, candidate in ranked:
+        cid = str(candidate["id"])
+        if cid in seen_ids:
+            continue
+        seen_ids.add(cid)
+        docs.append(candidate)
+        if len(docs) >= top_k:
+            break
+
+    return docs
+
+
+def _supabase_structured_retrieval(
+    query: str,
+    top_k: int,
+    supabase_url: str,
+    supabase_key: str,
+) -> list[dict[str, Any]]:
+    base = supabase_url.rstrip("/")
+    table = os.getenv("SUPABASE_RETRIEVAL_TABLE", "places")
+    select = os.getenv(
+        "SUPABASE_SQL_FACTS_SELECT",
+        "id,nombre,descripcion,slug,direccion,address,horario,opening_hours,price,precio,categoria,category,web,website",
+    )
+    timeout = float(os.getenv("SUPABASE_RETRIEVAL_TIMEOUT_SECONDS", "2.5"))
+
+    limit = max(1, top_k)
+    tokens = _tokenize_query(query)
+    search_filter = _build_search_filter(query, tokens)
+
+    headers = {
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}",
+        "Accept": "application/json",
+    }
+
+    with httpx.Client(timeout=timeout) as client:
+        rows = _fetch_rows(
+            client,
+            base=base,
+            table=table,
+            select=select,
+            headers=headers,
+            search_filter=search_filter,
+            limit=limit,
+        )
+
+    candidates: list[tuple[int, int, dict[str, Any]]] = []
+    for idx, row in enumerate(rows):
+        normalized = _normalize_structured_row(row, table=table)
+        if not normalized:
+            continue
+        score = _score_row(
+            row,
+            query,
+            tokens,
+            is_history_source=False,
+            historical_query=False,
+        )
+        candidates.append((score, idx, normalized))
+
     ranked = sorted(
         candidates,
         key=lambda item: (

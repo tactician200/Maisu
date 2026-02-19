@@ -74,6 +74,7 @@ def test_rag_query_fallback_path(monkeypatch) -> None:
     ]
 
     monkeypatch.setattr(provider, "generate", failing_generate)
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "narrative")
     monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
 
     response = client.post("/rag/query", json={"query": "Plan para 1 día", "lang": "es"})
@@ -343,3 +344,56 @@ def test_personalization_citations_invariants_hold(monkeypatch) -> None:
     assert data["fallback_used"] is False
     assert data["citations"] == docs
     assert all(item["id"] and item["source"] for item in data["citations"])
+
+
+def test_rag_query_structured_route_uses_sql_facts(monkeypatch) -> None:
+    sql_docs = [{"id": "s1", "title": "Guggenheim", "snippet": "Horario: 10:00-19:00", "source": "supabase://places/s1"}]
+
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "structured")
+    monkeypatch.setattr("app.main.retrieve_sql_facts", lambda query, top_k=3: sql_docs)
+
+    async def fake_generate(query: str, documents: list[dict], **kwargs) -> ProviderResult:
+        assert documents == sql_docs
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Horario del Guggenheim"})
+    assert response.status_code == 200
+    assert response.json()["citations"] == sql_docs
+
+
+def test_rag_query_narrative_route_uses_rag_retrieval(monkeypatch) -> None:
+    rag_docs = [{"id": "r1", "title": "Historia de Bilbao", "snippet": "Origen medieval", "source": "supabase://history/r1"}]
+
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "narrative")
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: rag_docs)
+
+    async def fake_generate(query: str, documents: list[dict], **kwargs) -> ProviderResult:
+        assert documents == rag_docs
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Historia del Casco Viejo"})
+    assert response.status_code == 200
+    assert response.json()["citations"] == rag_docs
+
+
+def test_rag_query_hybrid_route_combines_sql_and_rag(monkeypatch) -> None:
+    sql_docs = [{"id": "s1", "title": "Ribera", "snippet": "Horario: 08:00-15:00", "source": "supabase://places/s1"}]
+    rag_docs = [{"id": "r1", "title": "Historia Ribera", "snippet": "Mercado histórico", "source": "supabase://history/r1"}]
+
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "hybrid")
+    monkeypatch.setattr("app.main.retrieve_sql_facts", lambda query, top_k=2: sql_docs)
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: rag_docs)
+
+    async def fake_generate(query: str, documents: list[dict], **kwargs) -> ProviderResult:
+        assert documents == sql_docs + rag_docs
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Horario e historia de la Ribera"})
+    assert response.status_code == 200
+    assert response.json()["citations"] == sql_docs + rag_docs
