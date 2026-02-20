@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.onboarding import build_onboarding_next
 from app.providers import OpenAIProvider, ProviderError, build_fallback_answer
 from app.retrieval import retrieve_documents, retrieve_sql_facts
 from app.router import classify_query_route
@@ -78,7 +79,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-@app.post("/rag/query", response_model=QueryResponse)
+@app.post("/rag/query", response_model=QueryResponse, response_model_exclude_none=True)
 async def rag_query(request: QueryRequest) -> QueryResponse:
     started = time.perf_counter()
     route = classify_query_route(request.query)
@@ -102,7 +103,8 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
         docs = retrieve_documents(query=request.query, top_k=3)
 
     context = user_context_store.get_context(request.session_id) if request.session_id else None
-    context_preferences = normalize_preferences(context.get("preferences") if context else None)
+    raw_preferences = context.get("preferences") if context else None
+    context_preferences = normalize_preferences(raw_preferences)
 
     effective_lang = _normalize_lang_preference(request.lang)
     if not effective_lang and context:
@@ -147,6 +149,20 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
         fallback_used = True
         provider_name = "fallback"
 
+    onboarding_next = None
+    if request.session_id:
+        onboarding_next, updated_state = build_onboarding_next(
+            preferences=raw_preferences if isinstance(raw_preferences, dict) else None,
+            lang=effective_lang,
+        )
+        if onboarding_next and updated_state is not None:
+            merged_preferences = dict(raw_preferences) if isinstance(raw_preferences, dict) else {}
+            merged_preferences["onboarding"] = updated_state
+            user_context_store.upsert_context(
+                session_id=request.session_id,
+                data={"preferences": merged_preferences},
+            )
+
     latency_ms = int((time.perf_counter() - started) * 1000)
     return QueryResponse(
         answer=answer,
@@ -154,4 +170,5 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
         latency_ms=latency_ms,
         fallback_used=fallback_used,
         provider=provider_name,
+        onboarding_next=onboarding_next,
     )

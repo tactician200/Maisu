@@ -23,11 +23,13 @@ def test_rag_query_happy_path(monkeypatch) -> None:
 
     assert response.status_code == 200
     data = response.json()
-    assert set(data.keys()) == {"answer", "citations", "latency_ms", "fallback_used", "provider"}
+    assert set(data.keys()) == {"answer", "citations", "latency_ms", "fallback_used", "provider", "onboarding_next"}
     assert data["answer"] == "Respuesta de prueba"
     assert data["fallback_used"] is False
     assert data["provider"] == "openai"
     assert isinstance(data["citations"], list)
+    assert data["onboarding_next"]["field"] == "stay_duration"
+    assert isinstance(data["onboarding_next"]["question"], str)
 
 
 def test_rag_query_accepts_chatinput_alias(monkeypatch) -> None:
@@ -48,6 +50,53 @@ def test_rag_query_accepts_chatinput_alias(monkeypatch) -> None:
     assert response.status_code == 200
     assert observed["query"] == "Hola Bilbao"
     assert observed["lang"] == "es"
+
+
+def test_rag_query_skips_onboarding_when_profile_complete(monkeypatch) -> None:
+    session_id = "ctx-complete"
+    user_context_store._memory[session_id] = {
+        "session_id": session_id,
+        "preferences": {
+            "profile": {
+                "stay_duration": {"value": "3 días", "confidence": "high"},
+                "trip_type": {"value": "pareja", "confidence": "high"},
+                "dominant_interest": {"value": "cultura", "confidence": "high"},
+            }
+        },
+    }
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan cultural", "session_id": session_id})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "onboarding_next" not in data
+
+
+def test_rag_query_no_repeat_when_all_questions_asked(monkeypatch) -> None:
+    session_id = "ctx-asked"
+    user_context_store._memory[session_id] = {
+        "session_id": session_id,
+        "preferences": {
+            "profile": {},
+            "onboarding": {"asked": ["stay_duration", "trip_type", "dominant_interest"]},
+        },
+    }
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+        return ProviderResult(answer="ok", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan rápido", "session_id": session_id})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "onboarding_next" not in data
 
 
 def test_rag_query_rejects_blank_query() -> None:

@@ -69,7 +69,58 @@ Pass signal:
 - `/rag/query` returns `200` with `answer`, `citations`, `provider`, `fallback_used`.
 - With valid provider keys, `fallback_used=false`; without keys/upstream error, `fallback_used=true` and fallback answer still returns.
 
-## 4) Troubleshooting (short)
+## 4) Onboarding v1 (smoke + expected `onboarding_next`)
+
+Use this when the conversational onboarding flow is enabled in the orchestrator.
+
+```bash
+API_BASE="http://127.0.0.1:8000"
+SESSION_ID="ops-onboarding-smoke-001"
+
+# 4.1 Start onboarding (new session)
+curl -sS -X POST "$API_BASE/onboarding/next" \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"$SESSION_ID\",\"message\":\"Hola, venimos mi pareja y yo por 3 días\"}" | jq
+
+# 4.2 Answer the first question (send user reply)
+curl -sS -X POST "$API_BASE/onboarding/next" \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"$SESSION_ID\",\"message\":\"Es nuestra primera vez\"}" | jq
+
+# 4.3 Once complete, verify no further onboarding question is returned
+curl -sS -X POST "$API_BASE/onboarding/next" \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"$SESSION_ID\",\"message\":\"Nos gusta la gastronomía\"}" | jq
+```
+
+Expected `onboarding_next` response shape (example):
+
+```json
+{
+  "session_id": "ops-onboarding-smoke-001",
+  "onboarding_next": {
+    "ask": "¿Es vuestra primera vez en Bilbao?",
+    "fields": ["first_time"],
+    "phase": "activation",
+    "done": false
+  },
+  "profile_patch": {
+    "trip_type": "couple",
+    "stay_duration_days": 3
+  }
+}
+```
+
+Pass signal:
+- First call returns `onboarding_next.ask` with <= 1 question.
+- `profile_patch` reflects inferred or explicit values.
+- Final call returns `onboarding_next.done=true` or `onboarding_next` omitted.
+
+Rollback (if onboarding regresses):
+- Disable onboarding in the orchestration layer and route directly to standard `/rag/query`.
+- Clear any cached onboarding state in the session store (if applicable).
+
+## 5) Troubleshooting (short)
 
 - `GET /user-context/{session_id}` returns 404: run PUT first; verify exact `session_id` string.
 - Context not persisted in DB: check `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`; app silently falls back to in-memory store when Supabase is unavailable.

@@ -112,9 +112,15 @@ class Citation(BaseModel):
     source: str
 
 
+class OnboardingNext(BaseModel):
+    field: str
+    question: str
+
+
 class QueryResponse(BaseModel):
     answer: str
     citations: list[Citation]
     latency_ms: int
     fallback_used: bool
     provider: str
+    onboarding_next: OnboardingNext | None = None

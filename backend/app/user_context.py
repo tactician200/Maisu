@@ -14,6 +14,10 @@ def normalize_preferences(preferences: Any) -> dict[str, Any]:
 
     normalized: dict[str, Any] = {}
 
+    for key, value in preferences.items():
+        if key not in {"tone", "style", "interests"}:
+            normalized[key] = value
+
     tone = preferences.get("tone")
     if isinstance(tone, str):
         cleaned_tone = tone.strip().lower()
