@@ -72,7 +72,7 @@ class UserContextStore:
 
     def _get_context_supabase(self, session_id: str) -> dict[str, Any] | None:
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_API_KEY")
         if not supabase_url or not supabase_key:
             return None
 
@@ -107,7 +107,7 @@ class UserContextStore:
 
     def _upsert_context_supabase(self, session_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_API_KEY")
         if not supabase_url or not supabase_key:
             return None
 
