@@ -69,6 +69,15 @@ Pass signal:
 - `/rag/query` returns `200` with `answer`, `citations`, `provider`, `fallback_used`.
 - With valid provider keys, `fallback_used=false`; without keys/upstream error, `fallback_used=true` and fallback answer still returns.
 
+Quality guardrail interpretation (OpenAI boilerplate):
+- If `provider=openai` and `fallback_used=false`, the answer should be specific and task-focused.
+- Treat “low-value boilerplate” as a regression: apology-only replies, generic “cannot help/unknown” disclaimers, or templated safety language with no actionable content.
+- If boilerplate appears, capture the request/response pair and escalate.
+
+Alert criteria:
+- `provider=openai` + `fallback_used=false` + low-value boilerplate in `answer` => FAIL + alert.
+- If the same pattern appears in 2+ distinct queries in a single run, page the on-call even if other checks pass.
+
 ## 4) Onboarding v1 via `/rag/query` (smoke + expected `onboarding_next`)
 
 Onboarding v1 is embedded in `POST /rag/query` and returns optional `onboarding_next`.

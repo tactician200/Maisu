@@ -161,6 +161,98 @@ def test_rag_query_empty_provider_answer_triggers_fallback(monkeypatch) -> None:
     assert data["citations"] == docs
 
 
+def test_rag_query_guardrail_spanish_boilerplate_triggers_fallback(monkeypatch) -> None:
+    boilerplate = (
+        "1) Resumen: Estoy en modo de contingencia con precisión limitada.\n"
+        "2) Plan recomendado: Empieza por Casco Viejo y sigue a pie por la zona.\n"
+        "3) Consejos útiles: Ve pronto, reserva locales populares y confirma horarios."
+    )
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+        return ProviderResult(answer=boilerplate, provider="openai")
+
+    docs = [
+        {
+            "id": "d1",
+            "title": "Casco Viejo",
+            "snippet": "Calles históricas y pintxos",
+            "source": "supabase://places/d1",
+        }
+    ]
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "narrative")
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
+
+    response = client.post("/rag/query", json={"query": "Plan para 1 día", "lang": "es"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["fallback_used"] is True
+    assert data["provider"] == "fallback"
+    assert "Resumen" in data["answer"]
+    assert data["citations"] == docs
+
+
+def test_rag_query_guardrail_english_boilerplate_triggers_fallback(monkeypatch) -> None:
+    boilerplate = (
+        "1) Summary: I am running in fallback mode with limited precision.\n"
+        "2) Recommended plan: Start with Guggenheim and continue on foot nearby.\n"
+        "3) Useful tips: Go early, book popular spots, and verify opening hours."
+    )
+
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+        return ProviderResult(answer=boilerplate, provider="anthropic")
+
+    docs = [
+        {
+            "id": "d2",
+            "title": "Guggenheim",
+            "snippet": "Museo contemporáneo junto a la ría",
+            "source": "supabase://places/d2",
+        }
+    ]
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "narrative")
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
+
+    response = client.post("/rag/query", json={"query": "One day plan", "lang": "en"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["fallback_used"] is True
+    assert data["provider"] == "fallback"
+    assert "Summary" in data["answer"]
+    assert data["citations"] == docs
+
+
+def test_rag_query_guardrail_allows_normal_answer(monkeypatch) -> None:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+        return ProviderResult(answer="1) Resumen: Bilbao tiene opciones variadas.", provider="openai")
+
+    docs = [
+        {
+            "id": "d3",
+            "title": "Zubizuri",
+            "snippet": "Puente peatonal moderno",
+            "source": "supabase://places/d3",
+        }
+    ]
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+    monkeypatch.setattr("app.main.classify_query_route", lambda query: "narrative")
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
+
+    response = client.post("/rag/query", json={"query": "Plan breve", "lang": "es"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["fallback_used"] is False
+    assert data["provider"] == "openai"
+    assert data["answer"].startswith("1) Resumen")
+
+
 def test_user_context_put_and_get_roundtrip() -> None:
     session_id = "ctx-s1"
     user_context_store._memory.pop(session_id, None)

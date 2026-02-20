@@ -33,6 +33,9 @@ Ship stable personalization + onboarding baseline with SQL-backed context and au
 - [x] Supabase table exists + CRUD verified
 - [ ] End-to-end smoke script result captured
 
+## Next Checkpoint
+Confirm OpenAI quality-guardrail signals during the next smoke run (flag boilerplate responses immediately).
+
 ## Next 4-Hour Checkpoints
 - T+1h: Run API smoke script against running backend and capture results artifact.
 - T+2h: Review OpenClaw hardening run; log issues or confirm pass.

@@ -27,6 +27,16 @@ Optional DB verification (requires `psql`):
 - PASS: exit code `0` with `SMOKE_PASS` in the output.
 - FAIL: any non-zero exit code. The runner stops at the first failed check.
 
+## Quality guardrail (OpenAI boilerplate)
+
+Interpretation:
+- When `provider=openai` and `fallback_used=false`, answers must be specific and useful for the query.
+- “Low-value boilerplate” includes apology-only replies, generic refusal/unknown disclaimers, or templated safety text without actionable content.
+
+Alert criteria:
+- If `provider=openai` + `fallback_used=false` + low-value boilerplate in `answer`, mark the run as FAIL and alert.
+- If this occurs in 2+ distinct queries in a single nightly run, page the on-call even if remaining checks pass.
+
 ## Inputs
 
 - `SMOKE_BASE_URL`: API base URL (default `http://127.0.0.1:8000`).

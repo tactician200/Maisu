@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.onboarding import build_onboarding_next
-from app.providers import OpenAIProvider, ProviderError, build_fallback_answer
+from app.providers import OpenAIProvider, ProviderError, build_fallback_answer, is_low_value_answer
 from app.retrieval import retrieve_documents, retrieve_sql_facts
 from app.router import classify_query_route
 from app.schemas import QueryRequest, QueryResponse, UserContextResponse, UserContextUpsertRequest
@@ -138,6 +138,7 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
     fallback_used = False
     provider_name = "openai"
     logged_empty_answer = False
+    logged_quality_guardrail = False
 
     try:
         result = await provider.generate(
@@ -160,8 +161,27 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
             )
             logged_empty_answer = True
             raise ProviderError("empty provider answer")
+        if is_low_value_answer(answer):
+            _log_provider_fallback(
+                route=route,
+                provider_name=provider_name,
+                has_session_id=bool(request.session_id),
+                reason="quality_guardrail",
+            )
+            logged_quality_guardrail = True
+            answer = build_fallback_answer(
+                query=request.query,
+                documents=docs,
+                lang=effective_lang,
+                name=effective_name,
+                tone=effective_tone,
+                style=effective_style,
+                interests=effective_interests,
+            )
+            fallback_used = True
+            provider_name = "fallback"
     except ProviderError as exc:
-        if not logged_empty_answer:
+        if not logged_empty_answer and not logged_quality_guardrail:
             _log_provider_fallback(
                 route=route,
                 provider_name=provider_name,

@@ -1,4 +1,6 @@
 import os
+import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,6 +15,43 @@ class ProviderError(Exception):
 class ProviderResult:
     answer: str
     provider: str
+
+
+_LOW_VALUE_PATTERNS = [
+    "no he podido generar una respuesta en este momento",
+    "no puedo generar una respuesta en este momento",
+    "no se ha podido generar una respuesta en este momento",
+    "no se puede generar una respuesta en este momento",
+    "estoy en modo de contingencia con precision limitada",
+    "i couldnt generate a response at this time",
+    "i couldnt generate a response at the moment",
+    "i cant generate a response at this time",
+    "i cannot generate a response at this time",
+    "i am unable to generate a response at this time",
+    "i was unable to generate a response at this time",
+    "i am running in fallback mode with limited precision",
+]
+
+
+def _normalize_guardrail_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    normalized = normalized.lower()
+    normalized = re.sub(r"[^\w\s]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def is_low_value_answer(answer: str) -> bool:
+    if not answer:
+        return False
+    normalized = _normalize_guardrail_text(answer)
+    if not normalized:
+        return False
+    for pattern in _LOW_VALUE_PATTERNS:
+        if pattern in normalized:
+            return True
+    return False
 
 
 class OpenAIProvider:
