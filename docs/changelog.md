@@ -1,5 +1,9 @@
 # Maisu Changelog
 
+## 2026-02-20
+- Updated personalization v2 ops rollout runbook with preflight/deploy/post-deploy checks, override/fallback smoke steps, and rollback guidance.
+- Added release notes entry for personalization v2 rollout package.
+
 ## 2026-02-19
 - Hardened `/rag/query` validation and aligned contracts/docs with current runtime behavior.
 - Added ingestion audit artifacts: execution runbook and SQL verifier script for checks/rollback.

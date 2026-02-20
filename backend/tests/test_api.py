@@ -13,7 +13,7 @@ def test_health() -> None:
 
 
 def test_rag_query_happy_path(monkeypatch) -> None:
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         return ProviderResult(answer="Respuesta de prueba", provider="openai")
 
     monkeypatch.setattr(provider, "generate", fake_generate)
@@ -33,7 +33,7 @@ def test_rag_query_happy_path(monkeypatch) -> None:
 def test_rag_query_accepts_chatinput_alias(monkeypatch) -> None:
     observed: dict[str, str | None] = {}
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["query"] = query
         observed["lang"] = lang
         return ProviderResult(answer="ok", provider="openai")
@@ -61,7 +61,7 @@ def test_rag_query_rejects_blank_query() -> None:
 
 
 def test_rag_query_fallback_path(monkeypatch) -> None:
-    async def failing_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None):
+    async def failing_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None):
         raise ProviderError("rate limited")
 
     docs = [
@@ -133,7 +133,7 @@ def test_rag_query_uses_context_language_when_lang_missing(monkeypatch) -> None:
 
     observed: dict[str, str | None] = {}
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["lang"] = lang
         return ProviderResult(answer="ok", provider="openai")
 
@@ -163,7 +163,7 @@ def test_rag_query_citations_invariant_across_provider_paths(monkeypatch) -> Non
 
     monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
 
-    async def ok_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def ok_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         return ProviderResult(answer="ok", provider="openai")
 
     monkeypatch.setattr(provider, "generate", ok_generate)
@@ -176,7 +176,7 @@ def test_rag_query_citations_invariant_across_provider_paths(monkeypatch) -> Non
     assert ok_data["citations"] == docs
     assert all(c["source"] for c in ok_data["citations"])
 
-    async def fail_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None):
+    async def fail_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None):
         raise ProviderError("down")
 
     monkeypatch.setattr(provider, "generate", fail_generate)
@@ -232,7 +232,7 @@ def test_rag_query_uses_stored_language_when_lang_missing(monkeypatch) -> None:
 
     monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "eu"})
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["lang"] = lang
         return ProviderResult(answer="Kaixo", provider="openai")
 
@@ -249,7 +249,7 @@ def test_rag_query_explicit_lang_overrides_stored_language(monkeypatch) -> None:
 
     monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "eu"})
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["lang"] = lang
         return ProviderResult(answer="Hola", provider="openai")
 
@@ -266,7 +266,7 @@ def test_personalization_stored_preference_shapes_response_without_explicit_over
 
     monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "en"})
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["lang"] = lang
         return ProviderResult(answer="English response", provider="openai")
 
@@ -283,7 +283,7 @@ def test_personalization_explicit_preference_overrides_stored(monkeypatch) -> No
 
     monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "en"})
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["lang"] = lang
         return ProviderResult(answer="Respuesta", provider="openai")
 
@@ -295,12 +295,62 @@ def test_personalization_explicit_preference_overrides_stored(monkeypatch) -> No
     assert observed["lang"] == "es"
 
 
+def test_personalization_uses_stored_name_when_missing(monkeypatch) -> None:
+    observed: dict[str, str | None] = {}
+
+    monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "name": "Ane"})
+
+    async def fake_generate(
+        query: str,
+        documents: list[dict],
+        lang: str | None = None,
+        name: str | None = None,
+        tone: str | None = None,
+        style: str | None = None,
+        interests: list[str] | None = None,
+    ) -> ProviderResult:
+        observed["name"] = name
+        return ProviderResult(answer="Kaixo", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan", "session_id": "sess-name"})
+
+    assert response.status_code == 200
+    assert observed["name"] == "Ane"
+
+
+def test_personalization_explicit_name_overrides_stored(monkeypatch) -> None:
+    observed: dict[str, str | None] = {}
+
+    monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "name": "Ane"})
+
+    async def fake_generate(
+        query: str,
+        documents: list[dict],
+        lang: str | None = None,
+        name: str | None = None,
+        tone: str | None = None,
+        style: str | None = None,
+        interests: list[str] | None = None,
+    ) -> ProviderResult:
+        observed["name"] = name
+        return ProviderResult(answer="Kaixo", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan", "session_id": "sess-name", "name": "Iker"})
+
+    assert response.status_code == 200
+    assert observed["name"] == "Iker"
+
+
 def test_personalization_invalid_stored_preference_defaults_safely(monkeypatch) -> None:
     observed: dict[str, str | None] = {}
 
     monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "pirate"})
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         observed["lang"] = lang
         return ProviderResult(answer="ok", provider="openai")
 
@@ -331,7 +381,7 @@ def test_personalization_citations_invariants_hold(monkeypatch) -> None:
     monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
     monkeypatch.setattr(user_context_store, "get_context", lambda session_id: {"session_id": session_id, "language": "en"})
 
-    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+    async def fake_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
         return ProviderResult(answer=f"lang={lang}", provider="openai")
 
     monkeypatch.setattr(provider, "generate", fake_generate)

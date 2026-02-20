@@ -11,15 +11,23 @@ Grounded tourism answer endpoint using retrieval + provider generation with grac
 {
   "query": "¿Qué ver en Bilbao?",
   "session_id": "s1",
-  "lang": "es"
+  "lang": "es",
+  "name": "Ane",
+  "tone": "concise",
+  "style": "paragraph",
+  "interests": ["arte", "pintxos"]
 }
 ```
 
 | Field | Type | Required | Notes |
 |---|---|---:|---|
 | `query` | string | yes | Minimum length `1` (`Field(min_length=1)`). |
-| `session_id` | string \| null | no | Accepted but currently not used by runtime logic. |
+| `session_id` | string \| null | no | Used to load stored user context (language + personalization) when present. |
 | `lang` | string \| null | no | Passed to provider and fallback formatter (e.g. `en` returns English fallback text). |
+| `name` | string \| null | no | Personalization signal; overrides stored user name when provided. |
+| `tone` | string \| null | no | Allowed: `concise`, `detailed`. Overrides stored preference when provided. |
+| `style` | string \| null | no | Allowed: `bullets`, `paragraph`. Overrides stored preference when provided. |
+| `interests` | string[] \| null | no | Interest tags for personalization; overrides stored preference when provided. |
 
 ### Success response (`200`)
 
@@ -100,6 +108,11 @@ Example: empty `query`:
 - SQL/RAG/Hybrid route selection is handled upstream (conversation orchestration/tool-use layer), not inside `/rag/query`.
 - Therefore this API contract does not expose `route_type`, route confidence, or route trace.
 - Operational implication: validate routing from orchestrator logs/observability, not from this endpoint response alone.
+
+#### Personalization precedence (v2)
+- Explicit request fields (`name`, `tone`, `style`, `interests`, `lang`) override stored user context.
+- When a request field is missing, `/rag/query` falls back to stored user context values (if any).
+- If neither request nor context provides a value, defaults are used (`tone=concise`, `style=paragraph`, `interests=[]`).
 
 ## QA acceptance checklist (compact)
 

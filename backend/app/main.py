@@ -27,6 +27,13 @@ def _normalize_lang_preference(value: str | None) -> str | None:
     return None
 
 
+def _normalize_name_preference(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -61,6 +68,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "query": ["query", "chatInput"],
                 "session_id": ["session_id", "sessionId"],
                 "lang": ["lang"],
+                "name": ["name"],
                 "tone": ["tone"],
                 "style": ["style"],
                 "interests": ["interests"],
@@ -101,6 +109,11 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
         candidate_lang = context.get("language")
         effective_lang = _normalize_lang_preference(candidate_lang if isinstance(candidate_lang, str) else None)
 
+    effective_name = request.name
+    if not effective_name and context:
+        candidate_name = context.get("name")
+        effective_name = _normalize_name_preference(candidate_name if isinstance(candidate_name, str) else None)
+
     default_preferences = {"tone": "concise", "style": "paragraph", "interests": []}
     effective_tone = request.tone or context_preferences.get("tone") or default_preferences["tone"]
     effective_style = request.style or context_preferences.get("style") or default_preferences["style"]
@@ -114,6 +127,7 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
             query=request.query,
             documents=docs,
             lang=effective_lang,
+            name=effective_name,
             tone=effective_tone,
             style=effective_style,
             interests=effective_interests,
@@ -125,6 +139,7 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
             query=request.query,
             documents=docs,
             lang=effective_lang,
+            name=effective_name,
             tone=effective_tone,
             style=effective_style,
             interests=effective_interests,

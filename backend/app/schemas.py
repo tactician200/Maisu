@@ -12,6 +12,7 @@ class QueryRequest(BaseModel):
     query: str = Field(min_length=1, validation_alias=AliasChoices("query", "chatInput"))
     session_id: str | None = Field(default=None, validation_alias=AliasChoices("session_id", "sessionId"))
     lang: str | None = None
+    name: str | None = None
     tone: str | None = None
     style: str | None = None
     interests: list[str] | None = None
@@ -30,6 +31,14 @@ class QueryRequest(BaseModel):
         if value is None:
             return None
         cleaned = value.strip().lower()
+        return cleaned or None
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
         return cleaned or None
 
     @field_validator("tone")

@@ -48,12 +48,12 @@ SESSION_ID="ops-personalization-smoke-001"
 # 3.1 Upsert user context
 curl -sS -X PUT "$API_BASE/user-context/$SESSION_ID" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Ane","language":"eu","preferences":{"tone":"friendly","likes":["pintxos"]}}' | jq
+  -d '{"name":"Ane","language":"eu","preferences":{"tone":"concise","style":"paragraph","interests":["pintxos"]}}' | jq
 
 # 3.2 Read user context
 curl -sS "$API_BASE/user-context/$SESSION_ID" | jq
 
-# 3.3 RAG query using session context (no lang in request; should inherit stored language)
+# 3.3 RAG query using session context (no lang/name/tone/style/interests in request; should inherit stored values)
 curl -sS -X POST "$API_BASE/rag/query" \
   -H "Content-Type: application/json" \
   -d "{\"query\":\"Recomiéndame 2 planes en Bilbao\",\"session_id\":\"$SESSION_ID\"}" | jq '{provider,fallback_used,latency_ms,citations_count:(.citations|length),answer}'

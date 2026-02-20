@@ -12,6 +12,7 @@ def _stub_provider(monkeypatch, answer: str = "ok", provider_name: str = "openai
         query: str,
         documents: list[dict],
         lang: str | None = None,
+        name: str | None = None,
         tone: str | None = None,
         style: str | None = None,
         interests: list[str] | None = None,

@@ -26,6 +26,7 @@ class OpenAIProvider:
         query: str,
         documents: list[dict[str, Any]],
         lang: str | None = None,
+        name: str | None = None,
         tone: str | None = None,
         style: str | None = None,
         interests: list[str] | None = None,
@@ -64,6 +65,9 @@ class OpenAIProvider:
             personalization_rules.append(
                 "When relevant, prioritize suggestions connected to these interests: " + ", ".join(interests[:5]) + "."
             )
+
+        if name:
+            personalization_rules.append(f"Address the user as {name} once when appropriate.")
 
         if personalization_rules:
             system_prompt = system_prompt + " Personalization: " + " ".join(personalization_rules)
@@ -117,6 +121,7 @@ def build_fallback_answer(
     query: str,
     documents: list[dict[str, Any]],
     lang: str | None = None,
+    name: str | None = None,
     tone: str | None = None,
     style: str | None = None,
     interests: list[str] | None = None,
@@ -127,8 +132,9 @@ def build_fallback_answer(
     is_en = (lang or "").lower().startswith("en")
 
     if is_en:
+        greeting = f"Hi {name}. " if name else ""
         lines = [
-            "1) Summary: I am running in fallback mode with limited precision.",
+            f"1) Summary: {greeting}I am running in fallback mode with limited precision.",
             f"2) Recommended plan: Start with {docs_summary} and continue on foot nearby.",
             "3) Useful tips: Go early, book popular spots, and verify opening hours.",
         ]
@@ -137,8 +143,9 @@ def build_fallback_answer(
         if interests:
             lines.append("5) Interest note: Prioritize places related to " + ", ".join(interests[:3]) + ".")
     else:
+        greeting = f"Hola {name}. " if name else ""
         lines = [
-            "1) Resumen: Estoy en modo de contingencia con precisión limitada.",
+            f"1) Resumen: {greeting}Estoy en modo de contingencia con precisión limitada.",
             f"2) Plan recomendado: Empieza por {docs_summary} y sigue a pie por la zona.",
             "3) Consejos útiles: Ve pronto, reserva locales populares y confirma horarios.",
         ]

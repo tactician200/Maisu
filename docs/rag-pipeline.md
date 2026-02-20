@@ -6,7 +6,7 @@ This describes the live behavior implemented in `backend/app/main.py`, `retrieva
 
 1. **Validate request body** (`QueryRequest`)
    - Requires `query` (min length 1)
-   - Optional: `session_id`, `lang`
+   - Optional: `session_id`, `lang`, `name`, `tone`, `style`, `interests`
    - Invalid input returns FastAPI validation error (`422`, `detail[]`).
 
 2. **Retrieve documents**
@@ -20,7 +20,8 @@ This describes the live behavior implemented in `backend/app/main.py`, `retrieva
      - Rows are normalized into citation shape (`id/title/snippet/source`) with stable tie-break ordering.
 
 3. **Generate answer (provider path)**
-   - Tries `OpenAIProvider.generate(query, documents, lang)`.
+   - Resolves personalization with precedence: request fields > stored user context > defaults.
+   - Tries `OpenAIProvider.generate(query, documents, lang, name, tone, style, interests)`.
    - Provider builds prompt from retrieved docs and calls OpenAI Responses API.
    - On success:
      - `answer = result.answer`
@@ -29,7 +30,7 @@ This describes the live behavior implemented in `backend/app/main.py`, `retrieva
 
 4. **Fallback on provider failure**
    - If generation raises `ProviderError`:
-     - Build answer with `build_fallback_answer(query, documents, lang)`.
+     - Build answer with `build_fallback_answer(query, documents, lang, name, tone, style, interests)`.
      - `provider = "fallback"`
      - `fallback_used = true`
    - Fallback text format is fixed 3 sections:
