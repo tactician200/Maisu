@@ -136,6 +136,21 @@ def test_rag_query_fallback_path(monkeypatch) -> None:
     assert data["citations"] == docs
 
 
+def test_rag_query_empty_provider_answer_triggers_fallback(monkeypatch) -> None:
+    async def empty_generate(query: str, documents: list[dict], lang: str | None = None, name: str | None = None, tone: str | None = None, style: str | None = None, interests: list[str] | None = None) -> ProviderResult:
+        return ProviderResult(answer="   ", provider="openai")
+
+    monkeypatch.setattr(provider, "generate", empty_generate)
+
+    response = client.post("/rag/query", json={"query": "Plan para 1 día", "lang": "es"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["fallback_used"] is True
+    assert data["provider"] == "fallback"
+    assert "Resumen" in data["answer"]
+
+
 def test_user_context_put_and_get_roundtrip() -> None:
     session_id = "ctx-s1"
     user_context_store._memory.pop(session_id, None)

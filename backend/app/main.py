@@ -134,7 +134,9 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
             style=effective_style,
             interests=effective_interests,
         )
-        answer = result.answer
+        answer = (result.answer or "").strip()
+        if not answer:
+            raise ProviderError("empty provider answer")
         provider_name = result.provider
     except ProviderError:
         answer = build_fallback_answer(
