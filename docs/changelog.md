@@ -1,6 +1,7 @@
 # Maisu Changelog
 
 ## 2026-02-20
+- Added quality guardrail monitoring artifacts (log examples, grep/jq snippets, and fallback summary script).
 - Updated personalization v2 ops rollout runbook with preflight/deploy/post-deploy checks, override/fallback smoke steps, and rollback guidance.
 - Added release notes entry for personalization v2 rollout package.
 - Added Onboarding v1 rollout operator/product doc and onboarding smoke/rollback runbook section.

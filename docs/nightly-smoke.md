@@ -37,6 +37,10 @@ Alert criteria:
 - If `provider=openai` + `fallback_used=false` + low-value boilerplate in `answer`, mark the run as FAIL and alert.
 - If this occurs in 2+ distinct queries in a single nightly run, page the on-call even if remaining checks pass.
 
+Monitoring artifacts:
+- Log/event examples + grep/jq snippets: `docs/quality-guardrail-monitoring.md`
+- Fallback reason summary script: `scripts/quality-guardrail-report.sh`
+
 ## Inputs
 
 - `SMOKE_BASE_URL`: API base URL (default `http://127.0.0.1:8000`).

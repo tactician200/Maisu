@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app, provider, user_context_store
-from app.providers import ProviderError, ProviderResult
+from app.providers import ProviderError, ProviderResult, is_low_value_answer
 
 client = TestClient(app)
 
@@ -251,6 +251,15 @@ def test_rag_query_guardrail_allows_normal_answer(monkeypatch) -> None:
     assert data["fallback_used"] is False
     assert data["provider"] == "openai"
     assert data["answer"].startswith("1) Resumen")
+
+
+def test_low_value_guardrail_matches_punctuation_variants() -> None:
+    assert is_low_value_answer("I couldn't generate a response at this time.") is True
+    assert is_low_value_answer("¡Estoy en modo de contingencia, con precisión limitada!") is True
+
+
+def test_low_value_guardrail_allows_useful_content() -> None:
+    assert is_low_value_answer("1) Resumen: El Guggenheim abre a las 10:00 y cierra a las 19:00.") is False
 
 
 def test_user_context_put_and_get_roundtrip() -> None:
@@ -613,3 +622,46 @@ def test_rag_query_hybrid_route_combines_sql_and_rag(monkeypatch) -> None:
     response = client.post("/rag/query", json={"query": "Horario e historia de la Ribera"})
     assert response.status_code == 200
     assert response.json()["citations"] == sql_docs + rag_docs
+
+
+def test_openai_prompt_assembly_includes_personalization_and_references() -> None:
+    from app.providers import OpenAIProvider
+
+    provider_instance = OpenAIProvider()
+    docs = [
+        {"title": "Casco Viejo", "snippet": "Calles históricas", "source": "supabase://places/1"},
+        {"title": "Guggenheim", "snippet": "Museo junto a la ría", "source": "supabase://places/2"},
+    ]
+    system_prompt, user_prompt = provider_instance._build_prompts(
+        query="Plan de un día",
+        documents=docs,
+        lang="es",
+        name="Ane",
+        tone="concise",
+        style="bullets",
+        interests=["pintxos", "arte"],
+    )
+
+    assert "Bilbao tourism assistant" in system_prompt
+    assert "exactly 3 short sections" in system_prompt
+    assert "Personalization:" in system_prompt
+    assert "Address the user as Ane" in system_prompt
+    assert "Language: es" in user_prompt
+    assert "Question: Plan de un día" in user_prompt
+    assert "[1] Casco Viejo | Calles históricas | source: supabase://places/1" in user_prompt
+    assert "[2] Guggenheim | Museo junto a la ría | source: supabase://places/2" in user_prompt
+    assert "Quality rules:" in user_prompt
+
+
+def test_openai_prompt_assembly_includes_language_specific_insufficient_note() -> None:
+    from app.providers import OpenAIProvider
+
+    provider_instance = OpenAIProvider()
+    system_prompt, _ = provider_instance._build_prompts(
+        query="One day plan",
+        documents=[],
+        lang="en",
+        tone="concise",
+    )
+
+    assert "Insufficient information in the references." in system_prompt

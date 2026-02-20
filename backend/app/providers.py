@@ -33,13 +33,24 @@ _LOW_VALUE_PATTERNS = [
 ]
 
 
+_APOSTROPHE_RE = re.compile(r"[’']")
+_NON_WORD_RE = re.compile(r"[^\w\s]")
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
 def _normalize_guardrail_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
     normalized = normalized.lower()
-    normalized = re.sub(r"[^\w\s]", " ", normalized)
-    normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = _APOSTROPHE_RE.sub("", normalized)
+    normalized = _NON_WORD_RE.sub(" ", normalized)
+    normalized = _WHITESPACE_RE.sub(" ", normalized).strip()
     return normalized
+
+
+_NORMALIZED_LOW_VALUE_PATTERNS = tuple(
+    pattern for pattern in (_normalize_guardrail_text(p) for p in _LOW_VALUE_PATTERNS) if pattern
+)
 
 
 def is_low_value_answer(answer: str) -> bool:
@@ -48,7 +59,7 @@ def is_low_value_answer(answer: str) -> bool:
     normalized = _normalize_guardrail_text(answer)
     if not normalized:
         return False
-    for pattern in _LOW_VALUE_PATTERNS:
+    for pattern in _NORMALIZED_LOW_VALUE_PATTERNS:
         if pattern in normalized:
             return True
     return False
@@ -60,7 +71,7 @@ class OpenAIProvider:
         self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         self.timeout_seconds = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "8"))
 
-    async def generate(
+    def _build_prompts(
         self,
         query: str,
         documents: list[dict[str, Any]],
@@ -69,10 +80,7 @@ class OpenAIProvider:
         tone: str | None = None,
         style: str | None = None,
         interests: list[str] | None = None,
-    ) -> ProviderResult:
-        if not self.api_key:
-            raise ProviderError("OPENAI_API_KEY is missing")
-
+    ) -> tuple[str, str]:
         context_lines = []
         for idx, d in enumerate(documents, start=1):
             context_lines.append(
@@ -80,13 +88,21 @@ class OpenAIProvider:
             )
 
         lang_hint = (lang or "es").lower()
+        if lang_hint.startswith("en"):
+            insufficient_note = "Insufficient information in the references."
+        elif lang_hint.startswith("eu"):
+            insufficient_note = "Erreferentzietan informazio nahikorik ez."
+        else:
+            insufficient_note = "Información insuficiente en las referencias."
+
         system_prompt = (
             "You are a concise Bilbao tourism assistant. "
-            "Use only the provided references. "
-            "If info is missing, state uncertainty briefly. "
-            "Respond with exactly 3 short sections: '\n'"
-            "1) Resumen\n2) Plan recomendado\n3) Consejos útiles. "
-            "Do not invent citations or places not present in references."
+            "Use only the provided references and do not add places or facts not present. "
+            "Respond with exactly 3 short sections in the user's language: "
+            "'1) Resumen', '2) Plan recomendado', '3) Consejos útiles'. "
+            "Keep each section 1-3 sentences. "
+            "Avoid filler, apologies, or generic fallback language. "
+            f"If references are insufficient, say '{insufficient_note}' in the Summary and still provide the best possible plan grounded in what is available."
         )
 
         personalization_rules: list[str] = []
@@ -116,7 +132,35 @@ class OpenAIProvider:
             f"Question: {query}\n\n"
             "References:\n"
             + "\n".join(context_lines)
-            + "\n\nKeep output under 140 words."
+            + "\n\nQuality rules:\n"
+            "- Use details from at least 2 references when available.\n"
+            "- Mention source titles in each section.\n"
+            "- Keep output under 140 words."
+        )
+
+        return system_prompt, user_prompt
+
+    async def generate(
+        self,
+        query: str,
+        documents: list[dict[str, Any]],
+        lang: str | None = None,
+        name: str | None = None,
+        tone: str | None = None,
+        style: str | None = None,
+        interests: list[str] | None = None,
+    ) -> ProviderResult:
+        if not self.api_key:
+            raise ProviderError("OPENAI_API_KEY is missing")
+
+        system_prompt, user_prompt = self._build_prompts(
+            query=query,
+            documents=documents,
+            lang=lang,
+            name=name,
+            tone=tone,
+            style=style,
+            interests=interests,
         )
 
         payload = {
