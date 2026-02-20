@@ -24,36 +24,34 @@ Out of scope for v1:
 - Data policy and long-term retention rules.
 
 ## API contract (minimal)
-Endpoint: `POST /onboarding/next`
+Endpoint: `POST /rag/query` (onboarding is embedded in this response)
 
 Request (example):
 ```json
 {
-  "session_id": "ops-onboarding-smoke-001",
-  "message": "Hola, venimos mi pareja y yo por 3 días"
+  "query": "Hola, venimos mi pareja y yo por 3 días",
+  "session_id": "ops-onboarding-smoke-001"
 }
 ```
 
 Response (example):
 ```json
 {
-  "session_id": "ops-onboarding-smoke-001",
+  "answer": "...",
+  "citations": [],
+  "latency_ms": 98,
+  "fallback_used": false,
+  "provider": "openai",
   "onboarding_next": {
-    "ask": "¿Es vuestra primera vez en Bilbao?",
-    "fields": ["first_time"],
-    "phase": "activation",
-    "done": false
-  },
-  "profile_patch": {
-    "trip_type": "couple",
-    "stay_duration_days": 3
+    "field": "stay_duration",
+    "question": "¿Cuántos días vas a estar en Bilbao?"
   }
 }
 ```
 
 Completion behavior:
-- When onboarding is done, return `onboarding_next.done=true` or omit `onboarding_next`.
-- The response may still include `profile_patch` updates on the final turn.
+- When onboarding is done, `onboarding_next` is omitted.
+- Base response fields (`answer`, `citations`, `provider`, `fallback_used`) remain unchanged.
 
 ## Rollout/rollback
 - Rollout: enable onboarding in the orchestration layer for new sessions only.
