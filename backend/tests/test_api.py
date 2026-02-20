@@ -141,6 +141,15 @@ def test_rag_query_empty_provider_answer_triggers_fallback(monkeypatch) -> None:
         return ProviderResult(answer="   ", provider="openai")
 
     monkeypatch.setattr(provider, "generate", empty_generate)
+    docs = [
+        {
+            "id": "d1",
+            "title": "Etxebarria",
+            "snippet": "Vistas al Casco Viejo",
+            "source": "supabase://places/d1",
+        }
+    ]
+    monkeypatch.setattr("app.main.retrieve_documents", lambda query, top_k=3: docs)
 
     response = client.post("/rag/query", json={"query": "Plan para 1 día", "lang": "es"})
 
@@ -149,6 +158,7 @@ def test_rag_query_empty_provider_answer_triggers_fallback(monkeypatch) -> None:
     assert data["fallback_used"] is True
     assert data["provider"] == "fallback"
     assert "Resumen" in data["answer"]
+    assert data["citations"] == docs
 
 
 def test_user_context_put_and_get_roundtrip() -> None:

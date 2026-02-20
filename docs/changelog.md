@@ -5,6 +5,7 @@
 - Added release notes entry for personalization v2 rollout package.
 - Added Onboarding v1 rollout operator/product doc and onboarding smoke/rollback runbook section.
 - Added `scripts/smoke-user-context-onboarding.sh` for fast operator verification of SQL-backed context + `/rag/query` onboarding behavior.
+- Added `scripts/smoke.sh`, `Makefile` target `smoke`, and `docs/nightly-smoke.md` for automated smoke verification.
 - Added `docs/daily-execution-protocol.md` and `docs/today-task-board.md` for the “Comencemos/Cerramos” team ritual.
 - Aligned onboarding docs with actual runtime contract (`POST /rag/query` + optional `onboarding_next`).
 

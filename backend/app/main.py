@@ -1,3 +1,4 @@
+import logging
 import time
 
 from fastapi import FastAPI, HTTPException, Request
@@ -15,6 +16,19 @@ from app.user_context import UserContextStore, normalize_preferences
 app = FastAPI(title="MAISU/BILBOT RAG API", version="0.1.0")
 provider = OpenAIProvider()
 user_context_store = UserContextStore()
+logger = logging.getLogger(__name__)
+
+
+def _log_provider_fallback(route: str, provider_name: str, has_session_id: bool, reason: str) -> None:
+    logger.info(
+        "provider_fallback %s",
+        {
+            "route": route,
+            "provider": provider_name,
+            "has_session_id": has_session_id,
+            "reason": reason,
+        },
+    )
 
 
 def _normalize_lang_preference(value: str | None) -> str | None:
@@ -123,6 +137,7 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
 
     fallback_used = False
     provider_name = "openai"
+    logged_empty_answer = False
 
     try:
         result = await provider.generate(
@@ -134,11 +149,25 @@ async def rag_query(request: QueryRequest) -> QueryResponse:
             style=effective_style,
             interests=effective_interests,
         )
+        provider_name = result.provider or provider_name
         answer = (result.answer or "").strip()
         if not answer:
+            _log_provider_fallback(
+                route=route,
+                provider_name=provider_name,
+                has_session_id=bool(request.session_id),
+                reason="empty_answer",
+            )
+            logged_empty_answer = True
             raise ProviderError("empty provider answer")
-        provider_name = result.provider
-    except ProviderError:
+    except ProviderError as exc:
+        if not logged_empty_answer:
+            _log_provider_fallback(
+                route=route,
+                provider_name=provider_name,
+                has_session_id=bool(request.session_id),
+                reason=str(exc) or "provider_error",
+            )
         answer = build_fallback_answer(
             query=request.query,
             documents=docs,
