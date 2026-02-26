@@ -1,0 +1,17 @@
+
+# RabbitMQ Message Queue Configuration (Placeholder)
+
+host: localhost
+port: 5672
+username: guest
+password: guest
+
+queues:
+  - name: incoming_messages
+    durable: true
+    auto_delete: false
+  - name: llm_responses
+    durable: true
+    auto_delete: false
+
+# Further configurations for exchanges, topics, etc. would go here.

@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="${1:-$HOME/maisu_repo}"
-RUNTIME_DIR="${2:-$HOME/maisu}"
+if [[ "${1:-}" == "--check-layout" ]]; then
+  REPO_DIR="${2:-$PWD}"
+  RUNTIME_DIR=""
+  CHECK_ONLY=1
+else
+  REPO_DIR="${1:-$HOME/maisu_repo}"
+  RUNTIME_DIR="${2:-$HOME/maisu}"
+  CHECK_ONLY=0
+fi
 
 INTEGRATIONS_PATH="code/integrations_service"
 LLM_PATH="code/llm_service"
@@ -83,12 +90,18 @@ health_check() {
   return 1
 }
 
-log "repo=$REPO_DIR runtime=$RUNTIME_DIR"
+log "repo=$REPO_DIR runtime=${RUNTIME_DIR:-<none>}"
 
 [[ -d "$REPO_DIR/.git" ]] || fail "$REPO_DIR is not a git repository"
-require_dir "$RUNTIME_DIR"
 
 check_layout_or_fail
+
+if [[ "$CHECK_ONLY" == "1" ]]; then
+  log "Layout check OK"
+  exit 0
+fi
+
+require_dir "$RUNTIME_DIR"
 
 cd "$REPO_DIR"
 log "Updating repository"

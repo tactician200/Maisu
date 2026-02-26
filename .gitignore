@@ -21,3 +21,8 @@ node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Generated reports/artifacts
+reports/
+**/reports/
+*report*.json

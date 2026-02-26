@@ -2,6 +2,15 @@
 
 Chatbot turístico con personalidad local vasca usando **n8n + Supabase + Claude + RAG**.
 
+## 🧭 Runtime modes (current)
+
+- **Active runtime path (recommended): 2-service layout**
+  - `code/integrations_service` (FastAPI on `:8000`)
+  - `code/llm_service` (FastAPI on `:8001`)
+  - shared helpers/config under `code/*.yaml`, `code/*.sql`, and `config/system_prompt.md`
+- **Legacy path (kept for compatibility):** `backend/` single-service layout.
+  - This repo keeps `backend/` intact, but deploy v2 expects the 2-service tree.
+
 ## 🚀 Quick Start
 
 1. Configura Supabase y crea schema:
@@ -49,14 +58,18 @@ Guía detallada: **`SETUP.md`**
 Para entornos con runtime separado (repo → runtime), usa:
 
 ```bash
+# 1) Dry check de layout desde la raíz del repo
+./scripts/deploy_from_repo.sh --check-layout .
+
+# 2) Deploy completo (repo -> runtime)
 ./scripts/deploy_from_repo.sh [repo_dir] [runtime_dir]
 ```
 
-El script valida y prioriza el layout de 2 servicios:
+El script valida el layout de 2 servicios:
 - `code/integrations_service` (puerto `8000`)
 - `code/llm_service` (puerto `8001`)
 
-También preserva `.env`/`.venv` en runtime, reinicia ambos `uvicorn` y ejecuta health checks con logs accionables en caso de fallo.
+En modo completo también preserva `.env`/`.venv` en runtime, reinicia ambos `uvicorn` y ejecuta health checks con logs accionables en caso de fallo.
 
 ---
 
@@ -71,7 +84,15 @@ También preserva `.env`/`.venv` en runtime, reinicia ambos `uvicorn` y ejecuta 
 │   ├── system-prompt-aitor.md
 │   ├── n8n-workflows-guide.md
 │   └── ...
-├── backend/
+├── code/
+│   ├── integrations_service/
+│   ├── llm_service/
+│   ├── db/
+│   ├── *.yaml
+│   └── *.sql
+├── config/
+│   └── system_prompt.md
+├── backend/                  # legacy single-service layout (kept)
 │   ├── app/
 │   │   └── main.py
 │   ├── tests/

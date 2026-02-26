@@ -1,0 +1,28 @@
+
+# API Gateway Configuration (Placeholder)
+
+routes:
+  - path: /health
+    service: health_check_service
+    method: GET
+
+  - path: /webhooks/telegram
+    service: integrations_service
+    method: POST
+
+  - path: /webhooks/whatsapp
+    service: integrations_service
+    method: POST
+
+services:
+  health_check_service:
+    url: http://localhost:8080/health # Placeholder for health check
+  integrations_service:
+    url: http://localhost:8081 # Placeholder for Integrations Service
+
+security:
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+
+# Further configurations for SSL, authentication, etc. would go here.
