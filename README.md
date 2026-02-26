@@ -44,6 +44,20 @@ Chatbot turístico con personalidad local vasca usando **n8n + Supabase + Claude
 
 Guía detallada: **`SETUP.md`**
 
+### Deploy script (2-service architecture)
+
+Para entornos con runtime separado (repo → runtime), usa:
+
+```bash
+./scripts/deploy_from_repo.sh [repo_dir] [runtime_dir]
+```
+
+El script valida y prioriza el layout de 2 servicios:
+- `code/integrations_service` (puerto `8000`)
+- `code/llm_service` (puerto `8001`)
+
+También preserva `.env`/`.venv` en runtime, reinicia ambos `uvicorn` y ejecuta health checks con logs accionables en caso de fallo.
+
 ---
 
 ## 📁 Estructura del Proyecto
