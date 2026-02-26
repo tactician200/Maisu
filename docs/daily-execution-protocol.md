@@ -18,7 +18,8 @@ Use this exact checklist at start:
    - Lane A: implementation
    - Lane B: tests/validation
    - Lane C: docs/ops
-6. Gate definition
+6. Gate definition (mandatory before QA release)
+   - one-command gate: `make qa-release` (default release gate workflow; alias: `make qa-gate`)
    - required tests
    - smoke checks
    - rollback command
@@ -37,6 +38,11 @@ Use this exact checklist at start:
 - Test/smoke result
 - Risk notes
 - Decision needed (if any)
+
+### Implementation -> QA Release handoff (operator one-command)
+1. From repo root run: `make qa-release`
+2. Confirm terminal ends with: `QA_GATE_PASS`
+3. Only then mark the item as ready for QA release/handoff
 
 ---
 

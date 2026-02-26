@@ -53,6 +53,34 @@ _NORMALIZED_LOW_VALUE_PATTERNS = tuple(
 )
 
 
+def _extract_response_text(payload: dict[str, Any]) -> str | None:
+    output_text = payload.get("output_text")
+    if isinstance(output_text, str) and output_text.strip():
+        return output_text.strip()
+
+    output_items = payload.get("output")
+    if not isinstance(output_items, list):
+        return None
+
+    chunks: list[str] = []
+    for item in output_items:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            text_value = part.get("text")
+            if isinstance(text_value, str) and text_value.strip():
+                chunks.append(text_value.strip())
+
+    if chunks:
+        return "\n".join(chunks)
+    return None
+
+
 def is_low_value_answer(answer: str) -> bool:
     if not answer:
         return False
@@ -193,7 +221,7 @@ class OpenAIProvider:
             raise ProviderError(str(exc)) from exc
 
         data = response.json()
-        answer = data.get("output_text")
+        answer = _extract_response_text(data)
         if not answer:
             answer = "No he podido generar una respuesta en este momento."
 

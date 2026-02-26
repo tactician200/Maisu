@@ -1,49 +1,45 @@
 # Today Task Board — Maisu
 
-Date: 2026-02-20 (UTC)
+Date: 2026-02-23 (UTC)
+BMAD Phase: qa-release
+Required Gate (next): publish QA evidence + PO signoff for closeout
 
 ## Objective
-Ship stable personalization + onboarding baseline with SQL-backed context and automated smoke checks.
+Advance MAISU with BMAD discipline using integration-first scope (B): validate core API + smoke automation as release gate.
 
 ## Lanes
 
-### Lane A — Implementation
-- [x] Personalization v2 (`be5cb66`)
-- [x] Onboarding v1 in `/rag/query` (`2fb65f7`)
-- [x] Supabase key fallback (`41a5f84`)
-- [x] RAG fallback for empty provider answer (`c377009`)
+### Lane A — Implementation (bmad-dev)
+- [x] Confirm current core surface and contracts (`/rag/query`, personalization precedence, onboarding docs).
+- [x] Select and implement today’s P1 integration increment (gate wiring + one-command operator path).
 
-### Lane B — Validation
-- [x] Backend tests green (`47 passed`)
-- [x] Live Supabase read/write check (`201/200`)
-- [ ] API smoke script execution against running backend
+### Lane B — Validation (bmad-qa)
+- [x] Run mandatory release gate in one command: `make qa-release` (or `make qa-gate`).
+  - Result: `QA_GATE_PASS` (evidence: `artifacts/2026-02-23/qa-release.log`)
+- [x] Backend test suite executed in project venv with correct PYTHONPATH.
+  - Result: `55 passed`
+- [x] End-to-end local smoke run executed (`scripts/smoke.sh`).
+  - Result: `SMOKE_PASS`
+- [x] Extended onboarding smoke included via `qa-gate` (`SMOKE_ONBOARDING=1`) in release gate flow.
 
-### Lane C — Docs/Ops
-- [x] Personalization runbook updated
-- [x] Onboarding rollout doc aligned with actual API
-- [x] Daily execution protocol template + task board + smoke automation (`9088469`)
-- [ ] OpenClaw hardening run review (scheduled)
+### Lane C — Docs/Ops (admin)
+- [x] BMAD bridge artifacts created in workspace (`_bmad/artifacts/*`).
+- [x] Sprint status synced to implementation (`_bmad/workflow/sprint-status.yaml`).
+- [ ] Mirror today status + decisions into repo release notes / runbook if needed.
 
 ## Blockers
-- `sessions_spawn` intermittent pairing (`gateway closed 1008`).
-- Direct DB URI from this host blocked by IPv6 reachability; use SQL Editor/API path.
+- No active execution blockers.
+- Data-scope note: history-embeddings smoke is currently N/A in this environment because `historia_vasca` is not present (script now reports explicit SKIP).
 
 ## Ship Gate
-- [x] Unit/integration tests passing
-- [x] Supabase table exists + CRUD verified
-- [ ] End-to-end smoke script result captured
+- [x] Mandatory checkpoint: `make qa-release` returns `QA_GATE_PASS`.
+- [x] Unit/integration tests passing.
+- [x] Local end-to-end smoke PASS captured.
+- [x] P1 integration scope locked and delivered (gate wiring + mandatory operator command path).
 
-## Next Checkpoint
-Confirm OpenAI quality-guardrail signals during the next smoke run (flag boilerplate responses immediately).
-
-## Next 4-Hour Checkpoints
-- T+1h: Run API smoke script against running backend and capture results artifact.
-- T+2h: Review OpenClaw hardening run; log issues or confirm pass.
-- T+3h: Re-verify `sessions_spawn` pairing stability after smoke run.
-- T+4h: Update task board + prep afternoon status update.
+## First Checkpoint
+- T+90m: lock P1 integration scope and either ship increment or declare no-code release candidate with evidence.
 
 ## Rollback
-- Personalization v2 revert: `git revert be5cb66`
-- Onboarding v1 revert: `git revert 2fb65f7`
-- Supabase key fallback revert: `git revert 41a5f84`
-- RAG empty-answer fallback revert: `git revert c377009`
+- No production mutation executed in this cycle.
+- For future code increments: require commit-level rollback note in end-of-day closeout.
